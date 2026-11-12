@@ -35,5 +35,5 @@
 - macOS 适配：通用二进制构建脚本、签名/公证说明、本地网络权限与防火墙排障文档
 - `sadp-fake-device`：无真机时的端到端假设备
 
-[Unreleased]: https://example.invalid/sadp-discover/compare/v0.1.0...HEAD
-[0.1.0]: https://example.invalid/sadp-discover/releases/tag/v0.1.0
+[Unreleased]: https://github.com/delta-me13/sadp-discover/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/delta-me13/sadp-discover/releases/tag/v0.1.0
