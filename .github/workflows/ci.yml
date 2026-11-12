@@ -9,6 +9,11 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+# 连续 push 时只保留最新一轮：避免同一分支上多个完整构建并行（runner 也省）。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # 只做检查与测试，不产出 release 产物；产物统一由下面两个 job 负责，避免重复构建。
   test:
