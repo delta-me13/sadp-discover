@@ -15,7 +15,7 @@
 use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6, UdpSocket};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -89,6 +89,8 @@ pub struct UdpTransport {
     threads: Vec<JoinHandle<()>>,
     warnings: Vec<String>,
     joins: Vec<JoinStatus>,
+    /// 累计成功发出的数据报数（含逐网卡展开后的份数）。
+    sent: AtomicUsize,
 }
 
 impl UdpTransport {
@@ -188,6 +190,7 @@ impl UdpTransport {
             threads,
             warnings,
             joins,
+            sent: AtomicUsize::new(0),
         })
     }
 
@@ -487,6 +490,7 @@ impl Transport for UdpTransport {
                 NetError::NoInterface("no bound family matches requested".into())
             }));
         }
+        self.sent.fetch_add(sent_total, Ordering::Relaxed);
         Ok(())
     }
 
@@ -504,6 +508,10 @@ impl Transport for UdpTransport {
 
     fn bound_families(&self) -> &[Family] {
         &self.families
+    }
+
+    fn sent_packets(&self) -> usize {
+        self.sent.load(Ordering::Relaxed)
     }
 }
 

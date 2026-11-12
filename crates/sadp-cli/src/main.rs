@@ -112,6 +112,8 @@ fn run_scan(scan: ScanArgs, tui_mode: bool) -> u8 {
     }
 
     let transport: Arc<dyn Transport> = Arc::new(transport);
+    // 保留一份句柄：跑完之后还要读「到底有没有把包发出去」。
+    let sent_watch = Arc::clone(&transport);
 
     if tui_mode {
         return run_tui(cfg, transport, &notes);
@@ -123,9 +125,12 @@ fn run_scan(scan: ScanArgs, tui_mode: bool) -> u8 {
                 eprintln!("{message}");
                 return 2;
             }
-            if let Some(key) =
-                zero_response_hint(scan.passive, session.devices().len(), session.sadp_packets)
-            {
+            if let Some(key) = zero_response_hint(
+                scan.passive,
+                session.devices().len(),
+                session.sadp_packets,
+                sent_watch.sent_packets(),
+            ) {
                 eprintln!("{}", sadp_core::tr(key));
             }
             if session.devices().is_empty() { 1 } else { 0 }
@@ -216,13 +221,23 @@ fn emit(session: &Session, scan: &ScanArgs) -> Result<(), String> {
 
 /// 一台设备都没发现、而且连一个 SADP 响应报文都没收到时，给出针对性提示。
 ///
-/// 这和「设备不在线」是两回事：通常意味着本机根本没把包发出去/收回来，
-/// 例如 Windows 防火墙、macOS 15+ 的本地网络权限、或网段不对。
-fn zero_response_hint(passive: bool, devices: usize, packets: usize) -> Option<&'static str> {
+/// 两种情形必须分开说：
+/// - **一个探测包都没发出去**（sent_packets == 0）：本机根本没把包送出，
+///   macOS 15+ 的本地网络权限被拒就长这样——此时点名权限是合理的；
+/// - **包发出去了但没人回**（sent_packets > 0）：空网段、设备离线、跨 VLAN、
+///   或防火墙丢包，不该一律甩锅给「本地网络权限」。
+///
+/// 后者此前在 macOS 上会稳定误报权限提示（Gate 2 观察项 F2）。
+fn zero_response_hint(
+    passive: bool,
+    devices: usize,
+    packets: usize,
+    sent_packets: usize,
+) -> Option<&'static str> {
     if passive || devices > 0 || packets > 0 {
         return None;
     }
-    Some(if cfg!(target_os = "macos") {
+    Some(if cfg!(target_os = "macos") && sent_packets == 0 {
         "error.hint.macos_local_network"
     } else {
         "error.hint.no_sadp_packets"
@@ -250,15 +265,35 @@ mod tests {
 
     #[test]
     fn zero_response_hint_only_when_nothing_arrived() {
-        assert!(zero_response_hint(false, 0, 0).is_some());
-        assert!(zero_response_hint(false, 1, 0).is_none(), "有设备就不提示");
+        assert!(zero_response_hint(false, 0, 0, 0).is_some());
         assert!(
-            zero_response_hint(false, 0, 3).is_none(),
+            zero_response_hint(false, 1, 0, 5).is_none(),
+            "有设备就不提示"
+        );
+        assert!(
+            zero_response_hint(false, 0, 3, 5).is_none(),
             "收到过响应就不提示"
         );
         assert!(
-            zero_response_hint(true, 0, 0).is_none(),
+            zero_response_hint(true, 0, 0, 0).is_none(),
             "被动模式本来就没响应"
+        );
+    }
+
+    #[test]
+    fn permission_hint_requires_failed_sends() {
+        // 包一个都没发出去：macOS 才点名「本地网络权限」。
+        let unsent = zero_response_hint(false, 0, 0, 0).expect("hint");
+        if cfg!(target_os = "macos") {
+            assert_eq!(unsent, "error.hint.macos_local_network");
+        } else {
+            assert_eq!(unsent, "error.hint.no_sadp_packets");
+        }
+
+        // 包发出去了只是没人回：不论平台都退回通用提示（回归 F2）。
+        assert_eq!(
+            zero_response_hint(false, 0, 0, 12).expect("hint"),
+            "error.hint.no_sadp_packets"
         );
     }
 

@@ -107,11 +107,30 @@ impl Transport for MockTransport {
         Ok(None)
     }
 
+    fn sent_packets(&self) -> usize {
+        self.sent.lock().expect("mock sent").len()
+    }
+
     fn local_port(&self) -> u16 {
         self.port
     }
 
     fn bound_families(&self) -> &[Family] {
         &self.families
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sent_packets_counts_successful_probe_sends() {
+        let transport = MockTransport::single();
+        assert_eq!(transport.sent_packets(), 0, "没发包时应当是 0");
+        transport.send_probe(&[Family::V4], b"probe").expect("send");
+        transport
+            .send_probe(&[Family::V4, Family::V6], b"probe")
+            .expect("send");
+        assert_eq!(transport.sent_packets(), 2);
     }
 }

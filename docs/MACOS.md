@@ -71,8 +71,10 @@ macOS 15 起，访问局域网需要用户授权：
 没有收到任何 SADP 响应。macOS 15+ 需要在「系统设置 → 隐私与安全性 → 本地网络」中允许当前终端。
 ```
 
-这条提示由「0 台设备 + 0 个 SADP 响应报文」触发（`error.hint.macos_local_network`），
-与「设备不在线」区分开。
+这条提示只在**一个探测包都没发出去**时触发（`error.hint.macos_local_network`），
+即 `Transport::sent_packets() == 0`——权限被拒时发包会直接失败，这才是可靠信号。
+如果探测包发出去了、只是没人回应（空网段、设备离线、跨 VLAN、防火墙丢包），
+程序给出的是通用提示 `error.hint.no_sadp_packets`，不会把锅甩给本地网络权限。
 
 ### 应用防火墙
 
