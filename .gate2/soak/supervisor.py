@@ -47,6 +47,8 @@ def main():
     ap.add_argument("--fake", default="./target/debug/sadp-fake-device")
     ap.add_argument("--repeat", default="1000")
     ap.add_argument("--no-fake", action="store_true")
+    ap.add_argument("--local-port", type=int, default=None,
+                    help="真机模式下端口被占用时传 0，让内核挑临时端口")
     args = ap.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
@@ -64,6 +66,8 @@ def main():
     cmd = [args.bin, "--repeat", args.repeat]
     if not args.no_fake:
         cmd += ["--local-port", "0"]
+    elif args.local_port is not None:
+        cmd += ["--local-port", str(args.local_port)]
     cmd += ["-vv"]
     proc = subprocess.Popen(cmd, stdin=slave, stdout=slave, stderr=slave,
                             env=env, close_fds=True, start_new_session=True)
@@ -81,6 +85,14 @@ def main():
     next_sample = t0
     exit_code = None
     stopped_reason = "duration"
+    got = {"sig": None}
+    n_samples = 0
+
+    def on_signal(signum, _frame):
+        got["sig"] = signal.Signals(signum).name
+
+    signal.signal(signal.SIGTERM, on_signal)
+    signal.signal(signal.SIGINT, on_signal)
 
     def drain(timeout):
         nonlocal screen
@@ -97,10 +109,10 @@ def main():
         if len(screen) > 400_000:
             del screen[:200_000]
 
-    while time.time() < t0 + args.duration:
+    while time.time() < t0 + args.duration and got["sig"] is None:
         drain(0.2)
         if proc.poll() is not None:
-            stopped_reason = "scanner-exited-early"
+            stopped_reason = ("signal-" + got["sig"]) if got["sig"] else "scanner-exited-early"
             exit_code = proc.returncode
             break
         now = time.time()
@@ -110,9 +122,17 @@ def main():
                 m.update({"t_s": round(now - t0, 1), "time": iso(now)})
                 writer.writerow(m)
                 fh.flush()
+                n_samples += 1
+                if n_samples % 10 == 1:
+                    print("[%s] +%ds rss=%.1fMB fds=%d threads=%d sockets=%d log=%.1fMB" % (
+                        iso(now), now - t0, m["rss_kb"] / 1024, m["fds"], m["threads"],
+                        m["sockets"], m["log_bytes"] / 1048576), flush=True)
             next_sample = now + args.interval
     else:
         pass
+
+    if got["sig"] is not None:
+        stopped_reason = "signal-" + got["sig"]
 
     # graceful quit
     if proc.poll() is None:
