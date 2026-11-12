@@ -1,0 +1,44 @@
+{
+  "schema": "sadp.discover/v1",
+  "tool": "sadp-discover",
+  "version": "0.1.0",
+  "generated_at": "2026-11-12T03:40:19.822277Z",
+  "elapsed_ms": 3020,
+  "port": 37020,
+  "families": [
+    "v6"
+  ],
+  "rounds": 1,
+  "count": 1,
+  "devices": [
+    {
+      "sn": "DS-2CD2T47G2-L20210618AAWRL12345678",
+      "mac": "a4:14:37:5f:4c:6d",
+      "ipv4": "192.168.1.64",
+      "ipv6": [
+        {
+          "address": "fe80::472:e65:266:b793",
+          "scope_id": 11,
+          "global": false
+        }
+      ],
+      "dhcp": false,
+      "model": "DS-2CD2T47G2-L",
+      "description": "fake-device",
+      "firmware": "V5.7.3 build 210618",
+      "sdk_port": 8000,
+      "http_port": 80,
+      "activated": true,
+      "reset_ability": true,
+      "analog_channels": 0,
+      "digital_channels": 1,
+      "support": "0x00000000",
+      "seen_via": "v6",
+      "seen_on": [
+        "en0"
+      ],
+      "first_seen_ago_ms": 3014,
+      "last_seen_ago_ms": 3014
+    }
+  ]
+}

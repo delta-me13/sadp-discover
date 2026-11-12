@@ -1,2 +1,10 @@
 /target
 /dist
+
+# Gate 2 本地验收：脚本与证据入库，第三方依赖和运行数据不入库
+.gate2/pylib/
+.gate2/soak-*/
+.gate2/soak/*/
+
+# 扫描导出产物（随手 --output 出来的）
+/sadp-discover-*.json
