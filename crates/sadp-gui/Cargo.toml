@@ -14,8 +14,8 @@ path = "src/main.rs"
 sadp-core = { workspace = true }
 sadp-net = { workspace = true }
 clap = { workspace = true }
-eframe = "0.33"
-egui_extras = "0.33"
+eframe = "0.37"
+egui_extras = "0.37"
 fontdb = "0.24"
 anyhow = { workspace = true }
 crossbeam-channel = { workspace = true }

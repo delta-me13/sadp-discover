@@ -195,18 +195,19 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.draw(ctx);
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.draw(ui);
     }
 }
 
 impl App {
-    /// 与 eframe 解耦的绘制入口：测试可以在没有窗口的情况下跑完整 UI pass。
-    pub fn draw(&mut self, ctx: &egui::Context) {
+    /// 与 eframe 解耦的绘制入口：测试用 Context::run_ui 在没有窗口时跑完整 UI pass。
+    pub fn draw(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
         self.drain();
         self.view.filter = self.filter.clone();
 
-        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+        egui::Panel::top("toolbar").show(ui, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 let scanning = self.is_scanning();
@@ -231,7 +232,7 @@ impl App {
                     self.export(false);
                 }
                 if ui.button(tr("gui.action.copy")).clicked() {
-                    self.copy(ctx);
+                    self.copy(&ctx);
                 }
                 ui.separator();
                 if ui
@@ -264,7 +265,7 @@ impl App {
             ui.add_space(4.0);
         });
 
-        egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
+        egui::Panel::bottom("status").show(ui, |ui| {
             let total = self.session.devices().len();
             ui.horizontal(|ui| {
                 let scanning = self.is_scanning();
@@ -304,10 +305,10 @@ impl App {
         let devices: Vec<Device> = self.session.devices().to_vec();
         let visible = visible_indices(&devices, &self.view);
 
-        egui::SidePanel::right("detail")
+        egui::Panel::right("detail")
             .resizable(true)
-            .default_width(340.0)
-            .show(ctx, |ui| {
+            .default_size(340.0)
+            .show(ui, |ui| {
                 ui.add_space(4.0);
                 ui.heading(tr("tui.detail.title"));
                 ui.separator();
@@ -323,7 +324,7 @@ impl App {
                 }
             });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             if visible.is_empty() {
                 ui.centered_and_justified(|ui| {
                     ui.label(tr("tui.empty"));
@@ -568,9 +569,12 @@ mod tests {
         };
         let mut app = App::new(&ctx, cfg, transport);
 
-        let _ = ctx.run(raw_input(), |ctx| app.draw(ctx));
+        // 0.37 起 FullOutput 里的纹理增量必须被消费，否则 Drop 会 panic（无渲染器时清空即可）。
+        let mut out = ctx.run_ui(raw_input(), |ui| app.draw(ui));
+        out.textures_delta.clear();
         std::thread::sleep(Duration::from_millis(400));
-        let _ = ctx.run(raw_input(), |ctx| app.draw(ctx));
+        let mut out = ctx.run_ui(raw_input(), |ui| app.draw(ui));
+        out.textures_delta.clear();
 
         assert!(app.session.round >= 1, "扫描线程应至少完成一轮");
         assert!(
@@ -580,7 +584,8 @@ mod tests {
 
         // 选中第一台后详情面板也要能渲染。
         app.selected = app.session.devices().first().map(|d| d.key().0.clone());
-        let _ = ctx.run(raw_input(), |ctx| app.draw(ctx));
+        let mut out = ctx.run_ui(raw_input(), |ui| app.draw(ui));
+        out.textures_delta.clear();
     }
 
     #[test]
