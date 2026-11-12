@@ -1,0 +1,43 @@
+# cargo-deny 配置：依赖许可、已知漏洞与来源检查。本地运行：cargo deny check
+# CI 在 ubuntu-latest 上跑同一份配置（依赖图含 Linux 专有项，故忽略项按目标平台说明）。
+
+[advisories]
+version = 2
+yanked = "warn"
+ignore = [
+  { id = "RUSTSEC-2026-0192", reason = "ttf-parser 已归档，egui 文本栈仍依赖；等上游换掉后才能移除" },
+  { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml 仅是 serde_yaml（dev-dependency，用于 locale 快照测试）的传递依赖" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names 经 accesskit_unix（仅 Linux 无障碍后端）引入，本项目的 Windows/macOS 构建不启用" },
+  { id = "RUSTSEC-2026-0370", reason = "zvariant 同上：accesskit_unix / atspi 的传递依赖，仅 Linux 目标" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive 同上：accesskit_unix / atspi 的传递依赖，仅 Linux 目标" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "0BSD",
+  "BSL-1.0",
+  "MPL-2.0",
+  "Unlicense",
+  "OFL-1.1",
+  "Ubuntu-font-1.0",
+]
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

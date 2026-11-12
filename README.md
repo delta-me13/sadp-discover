@@ -11,19 +11,13 @@
 
 ## 当前状态
 
-| 里程碑 | 内容 | 状态 |
-|---|---|---|
-| M0 | workspace、工具链、crate 分层 | ✅ |
-| M1 | SADP 编解码（宽松解析、实体、老固件嵌套字段） | ✅ |
-| M2 | IPv4 组播 + 逐网卡子网广播 + 逐网卡组播出口 | ✅ |
-| M2b | IPv6 探测通道验证 | ⏳ 代码就绪，组地址仍需真机抓包确认（见下） |
-| M3 | 跨栈去重 / 逐字段合并 / 老化 / 事件流 | ✅ |
-| M4 | TUI（表格、详情、过滤、排序、导出、复制、语言切换） | ✅ |
-| M5 | `scan` / `interfaces` / `completions`、JSON / CSV、退出码 | ✅ |
-| M5b | 中英双语（CLI 帮助、TUI、错误提示、key 对齐测试） | ✅ |
-| M6 | 真机矩阵、打包 | 待真机 |
-| 二阶段 | macOS 适配 + Gate 2 验收 | ✅ 11/12（第 12 项 24h 连续性暂缓，工具链就绪） |
-| 三阶段 G1/G2 | egui 图形界面：窗口、扫描、表格、详情、过滤、排序、导出、复制、语言切换 | ✅ 起步可用（G3–G5 见路线图） |
+一阶段（Windows CLI/TUI）与二阶段（macOS 适配）已完成，三阶段的 egui 图形界面已可用。
+验收清单与进度见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 与 [docs/MACOS.md](docs/MACOS.md)。
+
+- ✅ **CLI / TUI**：双栈发现、跨栈去重、JSON·CSV、中英双语、日志落盘
+- ✅ **macOS**：Gate 2 清单 11/12（24h 连续性待跑），通用二进制脚本
+- ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 导出 / 复制 / 语言切换
+- ⏳ **待硬件**：真机矩阵、IPv6 组播地址抓包确认
 
 > **IPv6 说明（重要）**：SADP 的 IPv6 探测组播地址没有公开资料。当前实现按候选组
 > `ff02::1` 发送，可用 `--v6-mcast` 覆盖。若抓包证明设备不响应 IPv6 探测，
@@ -158,9 +152,11 @@ Probe ── v4 组播 239.255.255.250 / 各网卡子网广播
 ## 开发
 
 ```bash
-cargo test --workspace          # 102 个单元/集成测试
+cargo test --workspace                        # 单元 / 集成测试
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
+cargo deny check                              # 依赖许可 / 漏洞 / 来源
+cargo llvm-cov -p sadp-core --summary-only    # 覆盖率（当前行覆盖 83.8%）
 ```
 
 无真机时的端到端验证（需要组播可用的真实网卡）：
@@ -185,4 +181,4 @@ cargo test -p sadp-fake-device -- --ignored
 
 ## 许可证
 
-MIT OR Apache-2.0
+MIT OR Apache-2.0，见 [LICENSE-MIT](LICENSE-MIT) 与 [LICENSE-APACHE](LICENSE-APACHE)。

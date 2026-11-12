@@ -16,9 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-14 = Apple Silicon。Intel 由下面的交叉检查与通用二进制构建覆盖，
-        # 避免依赖已逐步下线的 Intel runner。
-        os: [windows-latest, macos-14]
+        # macos-14 / macos-15 = Apple Silicon 两代系统。Intel 由下面的交叉检查
+        # 与通用二进制构建覆盖，避免依赖已逐步下线的 Intel runner。
+        os: [windows-latest, macos-14, macos-15]
 
     steps:
       - uses: actions/checkout@v4
@@ -46,8 +46,8 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Build release binary
-        run: cargo build --release -p sadp-cli
+      - name: Build release binaries (CLI + GUI)
+        run: cargo build --release -p sadp-cli -p sadp-gui
 
   e2e:
     name: e2e (${{ matrix.os }})
@@ -104,3 +104,45 @@ jobs:
           name: sadp-discover-macos-universal
           path: dist/sadp-discover-*.tar.gz
           if-no-files-found: error
+
+  artifacts:
+    name: release artifacts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binaries
+        run: cargo build --release -p sadp-cli -p sadp-gui
+
+      - name: Smoke test CLI
+        shell: bash
+        run: ./target/release/sadp-discover${{ matrix.os == 'windows-latest' && '.exe' || '' }} --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sadp-discover-${{ matrix.os }}
+          path: |
+            target/release/sadp-discover
+            target/release/sadp-discover.exe
+            target/release/sadp-discover-gui
+            target/release/sadp-discover-gui.exe
+          if-no-files-found: error
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
