@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- 现场抓包：设备把描述里的 & 转义成了 &amp;，并且带了未知字段 -->
+<!DOCTYPE ProbeMatch SYSTEM "sadp.dtd">
+<ProbeMatch>
+  <Uuid>5d0c6f0e-8a4c-4b3e-9d21-7e2f4a1b9c33</Uuid>
+  <Types>Inquiry</Types>
+  <DeviceType>DS-2CD3T46WDV3-L</DeviceType>
+  <DeviceDescription>Lobby &amp; Entrance</DeviceDescription>
+  <DeviceSN>DS-2CD3T46WDV3-L20220101CCWRL00000001</DeviceSN>
+  <CommandPort>8000</CommandPort>
+  <HttpPort>80</HttpPort>
+  <MAC>A4-14-37-99-88-77</MAC>
+  <IPv4Address> 192.168.10.33 </IPv4Address>
+  <IPv4SubnetMask>255.255.255.0</IPv4SubnetMask>
+  <IPv4Gateway>192.168.10.1</IPv4Gateway>
+  <DHCP>1</DHCP>
+  <DSPVersion>V5.7.11 build 220101</DSPVersion>
+  <Activated>1</Activated>
+  <SecurityVersion>2</SecurityVersion>
+  <WebSocketPort>7681</WebSocketPort>
+  <Support>0x00000005</Support>
+</ProbeMatch>

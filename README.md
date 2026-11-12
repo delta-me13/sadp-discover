@@ -1,0 +1,177 @@
+# sadp-discover
+
+跨平台的海康（Hikvision）SADP 设备发现工具：**只读**、单文件、中英双语、支持 IPv4/IPv6 双栈。
+
+```text
+ sadp-discover   网卡: WLAN   第 3 轮   2 台设备   1.2s
+ IP 地址                    MAC                型号            来源   激活
+ 192.168.1.64               a4:14:37:5f:4c:6d  DS-2CD2T47G2-L  both   ✓
+ 192.168.1.65               44:19:b6:aa:bb:cc  DS-7608N-K2     v4     ✓
+```
+
+## 当前状态
+
+| 里程碑 | 内容 | 状态 |
+|---|---|---|
+| M0 | workspace、工具链、crate 分层 | ✅ |
+| M1 | SADP 编解码（宽松解析、实体、老固件嵌套字段） | ✅ |
+| M2 | IPv4 组播 + 逐网卡子网广播 + 逐网卡组播出口 | ✅ |
+| M2b | IPv6 探测通道验证 | ⏳ 代码就绪，组地址仍需真机抓包确认（见下） |
+| M3 | 跨栈去重 / 逐字段合并 / 老化 / 事件流 | ✅ |
+| M4 | TUI（表格、详情、过滤、排序、导出、复制、语言切换） | ✅ |
+| M5 | `scan` / `interfaces` / `completions`、JSON / CSV、退出码 | ✅ |
+| M5b | 中英双语（CLI 帮助、TUI、错误提示、key 对齐测试） | ✅ |
+| M6 | 真机矩阵、打包 | 待真机 |
+
+> **IPv6 说明（重要）**：SADP 的 IPv6 探测组播地址没有公开资料。当前实现按候选组
+> `ff02::1` 发送，可用 `--v6-mcast` 覆盖。若抓包证明设备不响应 IPv6 探测，
+> 程序仍会展示设备上报的 IPv6 地址（经 IPv4 发现时可见），并如实报告 limitations，
+> 不会伪造能力。
+
+## 构建
+
+需要 Rust 1.90+。
+
+```bash
+# Windows（MSVC）
+cargo build --release -p sadp-cli
+# 产物：target/release/sadp-discover.exe
+
+# macOS 通用二进制（arm64 + x86_64，需在 Mac 上运行）
+bash scripts/build-macos-universal.sh
+# 产物：dist/sadp-discover-<version>-macos-universal.tar.gz
+```
+
+macOS 的权限、签名与公证说明见 [docs/MACOS.md](docs/MACOS.md)。
+
+## 用法
+
+```bash
+sadp-discover                       # 交互式 TUI，单轮 3 秒
+sadp-discover --repeat 1000         # 每秒持续扫描
+sadp-discover --json                # 机器可读（schema sadp.discover/v1）
+sadp-discover --csv -o out.csv      # 导出 CSV
+sadp-discover --family v6 --no-tui  # 仅 IPv6，纯文本
+sadp-discover --passive             # 只监听设备主动通告
+sadp-discover interfaces            # 网卡列表 + 每个地址族的组播加入结果
+sadp-discover completions powershell
+```
+
+常用选项：
+
+| 选项 | 说明 |
+|---|---|
+| `--timeout <MS>` | 单轮收包窗口，默认 3000 |
+| `--repeat <MS>` | 每 N 毫秒开始新一轮；短于 `--timeout` 时自动收窄窗口 |
+| `--port <PORT>` | 探测目标端口，默认 37020 |
+| `--local-port <PORT>` | 本地绑定端口；`0` = 临时端口（与官方 SADP 同机运行时避免抢端口） |
+| `--interface <NAME>` | 只用指定网卡（名称/索引/地址，逗号分隔） |
+| `--family v4\|v6\|both` | 地址族 |
+| `--v6-mcast <ADDR>` | IPv6 组播组，默认 `ff02::1` |
+| `--stale <SECS>` | 超过 N 秒未再出现的设备从结果移除 |
+| `--save-raw <DIR>` | 原始报文落盘，便于排障 |
+| `--lang en-US\|zh-CN` | 界面语言 |
+
+TUI 快捷键：`s` 立即扫描（保留结果）、`空格` 暂停/继续、`r` 清空结果并重扫、`/` 过滤、`e` 导出、`c` 复制、`t/T` 换排序列/方向、`L` 切换语言（大小写均可）、`q` 退出。
+
+### 退出码
+
+| 码 | 含义 |
+|---|---|
+| 0 | 发现设备 |
+| 1 | 未发现设备 |
+| 2 | 参数错误或网络错误 |
+| 3 | 权限被拒（防火墙 / 提权） |
+
+### JSON schema
+
+`--json` 输出 `sadp.discover/v1`：字段只增不删，字段名不随语言变化。
+
+```json
+{
+  "schema": "sadp.discover/v1",
+  "tool": "sadp-discover",
+  "version": "0.1.0",
+  "generated_at": "2026-11-10T14:42:25Z",
+  "port": 37020,
+  "families": ["v4", "v6"],
+  "rounds": 1,
+  "count": 1,
+  "devices": [
+    {
+      "sn": "DS-2CD2T47G2-L20210618AAWRL12345678",
+      "mac": "a4:14:37:5f:4c:6d",
+      "ipv4": "192.168.1.64",
+      "ipv6": [{ "address": "fe80::21b:2bff:fe3c:4d5e", "scope_id": 22, "global": false }],
+      "seen_via": "both",
+      "seen_on": ["WLAN"],
+      "first_seen_ago_ms": 120,
+      "last_seen_ago_ms": 40
+    }
+  ]
+}
+```
+
+## 架构
+
+```text
+sadp-cli ──▶ sadp-core ──▶ sadp-net
+sadp-gui ──▶ sadp-core ──▶ sadp-net      （三阶段）
+```
+
+| crate | 职责 |
+|---|---|
+| `sadp-net` | 网卡枚举、双栈 UDP、组播/广播、接收线程（唯一出现 `cfg(target_os)` 的地方） |
+| `sadp-core` | 协议编解码、设备模型与去重合并、扫描引擎、视图逻辑、i18n |
+| `sadp-cli` | 参数解析、TUI、JSON/CSV 输出、日志 |
+| `sadp-fake-device` | 本地假设备，无真机时做端到端验证 |
+
+一次扫描的数据流：
+
+```text
+Probe ── v4 组播 239.255.255.250 / 各网卡子网广播
+       └─ v6 链路本地组播 ff02::1（候选，待验证）
+   │
+   ▼ sadp-net   每族一个 socket；逐网卡设置 IP_MULTICAST_IF；接收线程 → channel
+   ▼ sadp-core  ProbeMatch → DeviceStore（SN→MAC→IP 去重、逐字段合并）→ ScanEvent
+   ▼ sadp-cli   TUI / JSON / CSV / 纯文本
+```
+
+设计要点：
+
+- **同步线程而非 async**：小包低频，`Transport` trait 保留了替换空间。
+- **去重键优先级**：`SN` → `MAC` → `IPv4` → 全局 `IPv6`；同一设备经 v4/v6 各回一包时只显示一行，`via=both`。
+- **绑定 37020 失败自动退临时端口**，并提示用户；`--local-port 0` 可主动指定。
+- **只读**：任何代码路径都不向设备发送写指令。
+
+## 开发
+
+```bash
+cargo test --workspace          # 102 个单元/集成测试
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
+```
+
+无真机时的端到端验证（需要组播可用的真实网卡）：
+
+```bash
+cargo run -p sadp-fake-device -- --duration 15 &
+cargo run -p sadp-cli -- --no-tui --local-port 0 --timeout 2000
+# 或跑带 #[ignore] 的自动测试
+cargo test -p sadp-fake-device -- --ignored
+```
+
+更多设计细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)（含协议事实、风险登记与 ADR）。
+
+## 已知限制
+
+- IPv6 探测组地址未经验证（见上）。
+- 跨三层网段无法发现：设备只监听组播/广播，单播到设备 37020 通常被拒绝。
+- 响应可被伪造，结果仅用于发现与展示，不可作为安全决策依据。
+- 没有 SN / MAC / 地址的报文会被丢弃，不会显示成空白行。
+- Windows 首次运行可能触发防火墙提示，需手动允许。
+- 配置文件的读写尚未实现（当前只有命令行与环境变量）。
+
+## 许可证
+
+MIT OR Apache-2.0

@@ -1,0 +1,22 @@
+[package]
+name = "sadp-fake-device"
+description = "本地假 SADP 设备，用于无硬件环境下的端到端测试"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sadp-fake-device"
+path = "src/main.rs"
+
+[dependencies]
+socket2 = { workspace = true }
+if-addrs = { workspace = true }
+
+[dev-dependencies]
+sadp-core = { workspace = true }
+sadp-net = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProbeMatch>
+  <Types>inquiry</Types>
+  <MAC>bc:ad:28:12:34:56</MAC>
+  <IPv4Address>172.16.5.20</IPv4Address>
+  <IPv4SubnetMask>255.255.255.0</IPv4SubnetMask>
+</ProbeMatch>

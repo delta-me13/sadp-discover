@@ -1,0 +1,173 @@
+app:
+  name: sadp-discover
+  about: Discover Hikvision devices on the local network (read-only)
+  long_about: |
+    Discover Hikvision devices that speak SADP.
+
+    Sends a read-only probe over IPv4 multicast/broadcast and IPv6 link-local
+    multicast, then merges every reply into one row per device. Results from
+    IPv4 and IPv6 are merged by serial number / MAC, so a dual-stack device
+    appears exactly once.
+
+    This tool never modifies a device. Changing IP, activating a camera or
+    resetting a password is intentionally out of scope.
+
+cli:
+  after_help: |
+    EXIT CODES
+      0  devices found
+      1  no devices found
+      2  invalid arguments or network error
+      3  permission denied (firewall / raw socket)
+
+    EXAMPLES
+      sadp-discover                       # TUI, one 3 s round
+      sadp-discover --repeat 1000         # keep scanning every second
+      sadp-discover --json                # stable machine-readable output
+      sadp-discover --family v6 --no-tui  # IPv6 only, plain text
+      sadp-discover interfaces            # list adapters and multicast groups
+  cmd:
+    scan: Scan for devices (default)
+    interfaces: List network interfaces and multicast membership
+    completions: Generate shell completion scripts
+  arg:
+    timeout: "Scan window per round, in milliseconds (default %{default})"
+    repeat: "Start a new round every N ms (default: single round)"
+    port: "UDP port used for discovery (default %{default})"
+    local_port: "Local UDP port to bind (default: same as --port; 0 = ephemeral)"
+    interface: "Restrict to adapters by name, index or address (comma separated)"
+    bind: "Bind the IPv4 socket to this local address"
+    family: "Address families to use: v4, v6 or both (default both)"
+    v6_mcast: "IPv6 multicast group used for probing (default %{default})"
+    passive: "Do not send probes; only listen for device announcements"
+    json: "Print results as JSON (schema sadp.discover/v1)"
+    csv: "Print results as CSV"
+    output: "Write results to a file instead of stdout"
+    quiet: "Print device addresses only"
+    no_tui: "Disable the interactive TUI"
+    lang: "UI language: en-US or zh-CN"
+    log_level: "Log level: error, warn, info, debug or trace"
+    save_raw: "Directory to store raw ProbeMatch datagrams in"
+    stale: "Drop devices not seen for N seconds (0 = keep)"
+    shell: "Shell to generate completions for"
+    verbose: "Increase log verbosity (repeatable)"
+  value:
+    family: "v4, v6 or both"
+    shell: "bash, zsh, fish, powershell or elvish"
+  error:
+    unknown_family: "unknown address family %{value} (expected v4, v6 or both)"
+    bad_timeout: "invalid timeout %{value}"
+    bad_repeat: "invalid repeat interval %{value}"
+    bad_port: "invalid port %{value}"
+    bad_stale: "invalid duration %{value}"
+    write_failed: "cannot write %{path}: %{reason}"
+  note:
+    fallback_port: "port %{port} is busy; using ephemeral port %{actual} (replies may be lost)"
+    repeat_needs_tui: "--repeat only applies to the interactive TUI; running a single round instead"
+    window_clamped: "scan window %{timeout} ms is longer than --repeat %{repeat} ms; using %{used} ms per round"
+
+tui:
+  title: sadp-discover
+  header:
+    iface: "iface: %{iface}"
+    adapters: "iface: %{count} adapters"
+    round: "round #%{round}"
+    devices: "%{count} device(s)"
+    paused: PAUSED
+    idle: idle
+  col:
+    ip: IP address
+    mac: MAC
+    model: Model
+    via: Via
+    activated: Act
+    sn: Serial number
+    description: Description
+  status:
+    scanning: "Scanning… %{count} device(s), %{round} round(s)"
+    waiting: "Waiting for the next round… %{count} device(s)"
+    finished: "Done: %{count} device(s) in %{elapsed}"
+    paused: "Paused — %{count} device(s)"
+    filtered: "%{shown}/%{total} shown"
+    error: "Error: %{message}"
+    exported: "Exported to %{path}"
+    copied: "Copied to clipboard"
+    nothing_to_copy: "Nothing to copy"
+    no_responses: "No SADP responses — check firewall / local network permission"
+  detail:
+    title: Details
+    empty: Select a device to see its details.
+    sn: Serial number
+    mac: MAC
+    ipv4: IPv4
+    ipv6: IPv6
+    gateway: Gateway
+    dhcp: DHCP
+    ports: SDK / HTTP port
+    channels: Channels (analog / digital)
+    firmware: Firmware
+    model: Model
+    description: Description
+    first_seen: First seen
+    last_seen: Last seen
+    interfaces: Seen on
+    via: Discovered via
+    activated: Activated
+    reset: Password reset
+  help:
+    bar: "[s] scan [space] pause [r] clear+scan [/] filter [e] export [L] lang [q] quit"
+    filter: "Filter: %{query}_"
+    filter_clear: "Esc: clear filter"
+  filter:
+    prompt: "Filter devices"
+  empty: No devices found yet.
+  export:
+    done: "Exported to %{path}"
+    failed: "Export failed: %{reason}"
+
+common:
+  yes: "yes"
+  no: "no"
+  unknown: "unknown"
+  none: "-"
+  enabled: enabled
+  disabled: disabled
+  v4: IPv4
+  v6: IPv6
+  both: both
+
+out:
+  summary: "%{count} device(s) found"
+  no_devices: No devices found.
+  elapsed: "scan window %{elapsed}"
+  errors: "%{count} error(s); see the log for details"
+
+interfaces:
+  title: Network interfaces
+  none: No usable interfaces found.
+  name: Name
+  index: Index
+  ipv4: IPv4
+  ipv6: IPv6
+  multicast: Multicast join
+  loopback: Loopback
+  joined: joined
+  failed: failed
+  note: "* multicast membership is per socket and per address family"
+
+error:
+  net: "Network error: %{message}"
+  config: "Invalid configuration: %{message}"
+  io: "I/O error: %{message}"
+  permission: "Permission denied: %{message}"
+  no_interface: "No usable network interface: %{message}"
+  bind: "Cannot bind UDP port %{port}: %{reason}"
+  no_devices: "No devices found"
+  hint:
+    no_sadp_packets: "No SADP responses received. Check that the device is on the same L2 segment and that the firewall allows UDP 37020."
+    macos_local_network: "No SADP responses. On macOS 15+, allow this terminal under System Settings → Privacy & Security → Local Network."
+
+lang:
+  en: English
+  zh: 简体中文
+  auto: "Auto (system)"

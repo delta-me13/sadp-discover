@@ -1,0 +1,18 @@
+[package]
+name = "sadp-net"
+description = "SADP 平台传输层：网卡枚举、双栈 UDP 组播/广播"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+socket2 = { workspace = true }
+if-addrs = { workspace = true }
+crossbeam-channel = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,38 @@
+[package]
+name = "sadp-cli"
+description = "sadp-discover 命令行与 TUI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sadp-discover"
+path = "src/main.rs"
+
+[dependencies]
+sadp-core = { workspace = true }
+sadp-net = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+clap_complete = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+tui-input = { workspace = true }
+serde_json = { workspace = true }
+csv = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+time = { workspace = true }
+dirs = { workspace = true }
+unicode-width = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+
+[lints]
+workspace = true

@@ -1,0 +1,61 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/sadp-net",
+    "crates/sadp-core",
+    "crates/sadp-cli",
+    "crates/sadp-fake-device",
+]
+default-members = ["crates/sadp-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/sadp-discover"
+authors = ["sadp-discover contributors"]
+
+[workspace.dependencies]
+# 内部 crate
+sadp-net = { path = "crates/sadp-net" }
+sadp-core = { path = "crates/sadp-core" }
+
+# 一阶段依赖（版本由 cargo add 解析后锁定到 Cargo.lock）
+clap = { version = "4.6", features = ["cargo", "env", "wrap_help"] }
+clap_complete = "4.6"
+ratatui = "0.30"
+crossterm = "0.29"
+tui-input = "0.15"
+quick-xml = "0.42"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+csv = "1"
+socket2 = { version = "0.6", features = ["all"] }
+if-addrs = "0.15"
+crossbeam-channel = "0.5"
+rust-i18n = "4.2"
+sys-locale = "0.3"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+time = { version = "0.3", features = ["formatting", "local-offset", "macros"] }
+dirs = "6"
+unicode-width = "0.2"
+uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+codegen-units = 1
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+# `clippy::all` 全绿是 CI 门槛；pedantic 太吵，只按需单点开启。
+all = { level = "warn", priority = 0 }
+pedantic = { level = "allow", priority = -1 }

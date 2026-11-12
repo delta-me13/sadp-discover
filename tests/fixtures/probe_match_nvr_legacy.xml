@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProbeMatch>
+  <Uuid>6c1d2f10-21c4-4a6d-9c3a-2b8f1e6d4a11</Uuid>
+  <Types>inquiry</Types>
+  <DeviceType>DS-7608N-K2</DeviceType>
+  <DeviceDescription>NVR-01</DeviceDescription>
+  <CommandPort>8000</CommandPort>
+  <HttpPort>80</HttpPort>
+  <MAC>44:19:b6:aa:bb:cc</MAC>
+  <DeviceAddress>
+    <IPv4Address>10.0.0.9</IPv4Address>
+    <IPv4SubnetMask>255.255.0.0</IPv4SubnetMask>
+    <IPv4Gateway>10.0.0.1</IPv4Gateway>
+  </DeviceAddress>
+  <DHCP>false</DHCP>
+  <DSPVersion>V4.30.000 build 190521</DSPVersion>
+  <AnalogChannelNum>0</AnalogChannelNum>
+  <DigitalChannelNum>8</DigitalChannelNum>
+</ProbeMatch>

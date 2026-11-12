@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProbeMatch>
+  <Uuid>b3a8e3a2-6f1e-4e5a-9c1b-2d7f0a4c9e77</Uuid>
+  <Types>inquiry</Types>
+  <DeviceType>DS-2DE7A425IW-AEB</DeviceType>
+  <DeviceDescription>球机-东门</DeviceDescription>
+  <DeviceSN>DS-2DE7A425IW-AEB20230512BBWRL87654321</DeviceSN>
+  <CommandPort>8000</CommandPort>
+  <HttpPort>443</HttpPort>
+  <MAC>a4:14:37:11:22:33</MAC>
+  <IPv4Address>192.168.1.65</IPv4Address>
+  <IPv4SubnetMask>255.255.255.0</IPv4SubnetMask>
+  <IPv4Gateway>192.168.1.1</IPv4Gateway>
+  <IPv6Address>fe80::21b:2bff:fe3c:4d5e</IPv6Address>
+  <IPv6Address>2001:db8:1:2::65</IPv6Address>
+  <IPv6Masklen>64</IPv6Masklen>
+  <IPv6Gateway>2001:db8:1:2::1</IPv6Gateway>
+  <DHCP>true</DHCP>
+  <DSPVersion>V5.8.0 build 230512</DSPVersion>
+  <Activated>true</Activated>
+  <PasswordResetAbility>true</PasswordResetAbility>
+  <AnalogChannelNum>0</AnalogChannelNum>
+  <DigitalChannelNum>1</DigitalChannelNum>
+  <Support>0x00000003</Support>
+</ProbeMatch>

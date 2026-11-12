@@ -1,0 +1,106 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-14 = Apple Silicon。Intel 由下面的交叉检查与通用二进制构建覆盖，
+        # 避免依赖已逐步下线的 Intel runner。
+        os: [windows-latest, macos-14]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Cross-check Intel macOS target
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo check --workspace --target x86_64-apple-darwin
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Build release binary
+        run: cargo build --release -p sadp-cli
+
+  e2e:
+    name: e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # 假设备依赖真实网卡的组播回环；GitHub runner 上通常可用，
+      # 若被防火墙拦截则该 job 失败，属于环境问题而非代码回归。
+      - name: Fake device end-to-end
+        run: cargo test -p sadp-fake-device -- --ignored --nocapture
+
+  macos-universal:
+    name: macOS universal binary
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build universal binary
+        run: bash scripts/build-macos-universal.sh
+
+      - name: Verify architectures
+        run: |
+          lipo -info dist/sadp-discover
+          file dist/sadp-discover
+
+      - name: Smoke test (native arm64)
+        run: |
+          ./dist/sadp-discover --version
+          # 不要直接管道给 head：Rust 默认忽略 SIGPIPE，管道提前关闭会让进程报错。
+          ./dist/sadp-discover interfaces --json > interfaces.json
+          head -20 interfaces.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sadp-discover-macos-universal
+          path: dist/sadp-discover-*.tar.gz
+          if-no-files-found: error

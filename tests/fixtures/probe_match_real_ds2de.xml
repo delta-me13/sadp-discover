@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ProbeMatch><Uuid>00000000-0000-4000-8000-000000000000</Uuid>
+<Types>inquiry</Types>
+<DeviceType>196607</DeviceType>
+<DeviceDescription>DS-2DE4423DW-D/GLT/XM</DeviceDescription>
+<DeviceSN>DS-2DE4423DW-D/GLT/XM20200101CCCHGQ0000000</DeviceSN>
+<CommandPort>8000</CommandPort>
+<HttpPort>80</HttpPort>
+<MAC>04-ee-cd-00-00-32</MAC>
+<IPv4Address>192.168.1.120</IPv4Address>
+<IPv4SubnetMask>255.255.255.0</IPv4SubnetMask>
+<IPv4Gateway>192.168.1.1</IPv4Gateway>
+<IPv6Address>::</IPv6Address>
+<IPv6Gateway>::</IPv6Gateway>
+<IPv6MaskLen>64</IPv6MaskLen>
+<DHCP>false</DHCP>
+<AnalogChannelNum>0</AnalogChannelNum>
+<DigitalChannelNum>1</DigitalChannelNum>
+<SoftwareVersion>V5.8.2build 241217</SoftwareVersion>
+<DSPVersion>V7.3 build 241203</DSPVersion>
+<BootTime>1970-01-01 00:00:30</BootTime>
+<Encrypt>true</Encrypt>
+<ResetAbility>false</ResetAbility>
+<DiskNumber>0</DiskNumber>
+<Activated>true</Activated>
+<PasswordResetAbility>true</PasswordResetAbility>
+<PasswordResetModeSecond>true</PasswordResetModeSecond>
+<DetailOEMCode>1</DetailOEMCode>
+<SupportSecurityQuestion>true</SupportSecurityQuestion>
+<SupportHCPlatform>true</SupportHCPlatform>
+<HCPlatformEnable>flase</HCPlatformEnable>
+<IsModifyVerificationCode>true</IsModifyVerificationCode>
+<Salt>0000000000000000000000000000000000000000000000000000000000000000</Salt>
+<DeviceLock>true</DeviceLock>
+<codeEncrypt>true</codeEncrypt>
+<SupportMailBox>true</SupportMailBox>
+<supportEzvizUnbind>true</supportEzvizUnbind>
+<deviceTypeV2>11669066</deviceTypeV2>
+<EZVIZBindStatus>0</EZVIZBindStatus>
+<physicalAccessVerification>2,3,4</physicalAccessVerification>
+</ProbeMatch>

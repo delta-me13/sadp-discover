@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProbeMatch>
+  <Uuid>0f8fad5b-d9cb-469f-a165-70867728950e</Uuid>
+  <Types>inquiry</Types>
+  <DeviceType>DS-2CD2T47G2-L</DeviceType>
+  <DeviceDescription>IPCamera</DeviceDescription>
+  <DeviceSN>DS-2CD2T47G2-L20210618AAWRL12345678</DeviceSN>
+  <CommandPort>8000</CommandPort>
+  <HttpPort>80</HttpPort>
+  <MAC>a4:14:37:5f:4c:6d</MAC>
+  <IPv4Address>192.168.1.64</IPv4Address>
+  <IPv4SubnetMask>255.255.255.0</IPv4SubnetMask>
+  <IPv4Gateway>192.168.1.1</IPv4Gateway>
+  <DHCP>false</DHCP>
+  <DSPVersion>V5.7.3 build 210618</DSPVersion>
+  <Activated>true</Activated>
+  <PasswordResetAbility>true</PasswordResetAbility>
+  <AnalogChannelNum>0</AnalogChannelNum>
+  <DigitalChannelNum>1</DigitalChannelNum>
+  <Support>0x00000000</Support>
+</ProbeMatch>

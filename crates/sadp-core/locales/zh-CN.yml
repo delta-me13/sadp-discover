@@ -1,0 +1,170 @@
+app:
+  name: sadp-discover
+  about: 发现局域网内的海康（Hikvision）设备（只读）
+  long_about: |
+    发现局域网内支持 SADP 协议的海康设备。
+
+    通过 IPv4 组播/广播与 IPv6 链路本地组播发送只读探测报文，
+    再把每台设备的多次应答合并成一行。IPv4 与 IPv6 的结果按序列号 / MAC
+    合并，因此双栈设备只会出现一次。
+
+    本工具不会修改设备。改 IP、激活摄像头、重置密码均不在本期范围内。
+
+cli:
+  after_help: |
+    退出码
+      0  发现设备
+      1  未发现设备
+      2  参数错误或网络错误
+      3  权限被拒（防火墙 / 提权）
+
+    示例
+      sadp-discover                       # TUI，单轮 3 秒
+      sadp-discover --repeat 1000         # 每秒持续扫描
+      sadp-discover --json                # 稳定的机器可读输出
+      sadp-discover --family v6 --no-tui  # 仅 IPv6，纯文本
+      sadp-discover interfaces            # 列出网卡与组播加入情况
+  cmd:
+    scan: 扫描设备（默认命令）
+    interfaces: 列出网卡与组播加入情况
+    completions: 生成 shell 补全脚本
+  arg:
+    timeout: "单轮扫描时长，毫秒（默认 %{default}）"
+    repeat: "每 N 毫秒开始新一轮（默认只扫一轮）"
+    port: "发现使用的 UDP 端口（默认 %{default}）"
+    local_port: "本地绑定端口（默认与 --port 相同；0 表示临时端口）"
+    interface: "只使用指定网卡，按名称、索引或地址匹配（逗号分隔）"
+    bind: "把 IPv4 socket 绑定到指定本地地址"
+    family: "地址族：v4、v6 或 both（默认 both）"
+    v6_mcast: "探测使用的 IPv6 组播地址（默认 %{default}）"
+    passive: "只被动监听设备通告，不发送探测包"
+    json: "以 JSON 输出结果（schema sadp.discover/v1）"
+    csv: "以 CSV 输出结果"
+    output: "把结果写入文件而不是标准输出"
+    quiet: "只输出设备地址"
+    no_tui: "关闭交互式 TUI"
+    lang: "界面语言：en-US 或 zh-CN"
+    log_level: "日志级别：error、warn、info、debug 或 trace"
+    save_raw: "把原始 ProbeMatch 报文保存到该目录"
+    stale: "超过 N 秒未再出现的设备从结果中移除（0 = 保留）"
+    shell: "生成补全的目标 shell"
+    verbose: "提高日志详细程度（可重复）"
+  value:
+    family: "v4、v6 或 both"
+    shell: "bash、zsh、fish、powershell 或 elvish"
+  error:
+    unknown_family: "未知地址族 %{value}（应为 v4、v6 或 both）"
+    bad_timeout: "无效的扫描时长 %{value}"
+    bad_repeat: "无效的重复间隔 %{value}"
+    bad_port: "无效的端口 %{value}"
+    bad_stale: "无效的时长 %{value}"
+    write_failed: "无法写入 %{path}：%{reason}"
+  note:
+    fallback_port: "端口 %{port} 被占用，改用临时端口 %{actual}（可能收不到部分回包）"
+    repeat_needs_tui: "非交互模式下 --repeat 不生效，已改为单轮扫描"
+    window_clamped: "扫描窗口 %{timeout}ms 长于 --repeat %{repeat}ms，每轮窗口改为 %{used}ms"
+
+tui:
+  title: sadp-discover
+  header:
+    iface: "网卡：%{iface}"
+    adapters: "网卡：%{count} 个"
+    round: "第 %{round} 轮"
+    devices: "%{count} 台设备"
+    paused: 已暂停
+    idle: 空闲
+  col:
+    ip: IP 地址
+    mac: MAC
+    model: 型号
+    via: 来源
+    activated: 激活
+    sn: 序列号
+    description: 描述
+  status:
+    scanning: "扫描中… 已发现 %{count} 台，第 %{round} 轮"
+    waiting: "等待下一轮… 已发现 %{count} 台"
+    finished: "完成：%{elapsed} 内发现 %{count} 台"
+    paused: "已暂停 — %{count} 台设备"
+    filtered: "显示 %{shown}/%{total} 台"
+    error: "错误：%{message}"
+    exported: "已导出到 %{path}"
+    copied: "已复制到剪贴板"
+    nothing_to_copy: "没有可复制的内容"
+    no_responses: 未收到 SADP 响应 —— 请检查防火墙 / 本地网络权限
+  detail:
+    title: 详情
+    empty: 选择一台设备查看详情。
+    sn: 序列号
+    mac: MAC
+    ipv4: IPv4
+    ipv6: IPv6
+    gateway: 网关
+    dhcp: DHCP
+    ports: SDK / HTTP 端口
+    channels: 通道数（模拟 / 数字）
+    firmware: 固件版本
+    model: 型号
+    description: 描述
+    first_seen: 首次发现
+    last_seen: 最近发现
+    interfaces: 来源网卡
+    via: 发现方式
+    activated: 已激活
+    reset: 支持密码重置
+  help:
+    bar: "[s] 扫描 [空格] 暂停 [r] 清空重扫 [/] 过滤 [e] 导出 [L] 语言 [q] 退出"
+    filter: "过滤：%{query}_"
+    filter_clear: "Esc：清除过滤"
+  filter:
+    prompt: 过滤设备
+  empty: 尚未发现设备。
+  export:
+    done: "已导出到 %{path}"
+    failed: "导出失败：%{reason}"
+
+common:
+  yes: 是
+  no: 否
+  unknown: 未知
+  none: "-"
+  enabled: 已启用
+  disabled: 已禁用
+  v4: IPv4
+  v6: IPv6
+  both: 双栈
+
+out:
+  summary: "共发现 %{count} 台设备"
+  no_devices: 未发现设备
+  elapsed: "扫描窗口 %{elapsed}"
+  errors: "%{count} 个错误，详见日志"
+
+interfaces:
+  title: 网络接口
+  none: 没有找到可用网卡。
+  name: 名称
+  index: 索引
+  ipv4: IPv4
+  ipv6: IPv6
+  multicast: 组播加入
+  loopback: 回环
+  joined: 已加入
+  failed: 失败
+  note: "* 组播成员关系按 socket 与地址族分别维护"
+
+error:
+  net: "网络错误：%{message}"
+  config: "配置无效：%{message}"
+  io: "I/O 错误：%{message}"
+  permission: "权限被拒：%{message}"
+  no_interface: "没有可用网卡：%{message}"
+  bind: "无法绑定 UDP 端口 %{port}：%{reason}"
+  no_devices: 未发现设备
+  hint:
+    no_sadp_packets: "没有收到任何 SADP 响应。请确认设备与主机在同一二层网段，且防火墙放行 UDP 37020。"
+    macos_local_network: "没有收到任何 SADP 响应。macOS 15+ 需要在「系统设置 → 隐私与安全性 → 本地网络」中允许当前终端。"
+lang:
+  en: English
+  zh: 简体中文
+  auto: "自动（跟随系统）"
