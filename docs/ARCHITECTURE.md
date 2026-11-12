@@ -701,9 +701,35 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
 仍需 macOS 真机才能完成的部分：本地网络授权弹窗、应用防火墙行为、
 链路本地 IPv6 的 scope 语义、TUI 在 Terminal/iTerm 下的实际渲染。
 
-### 13.5 建议的下一步
+### 13.5 三阶段（egui 图形界面）进展
+
+新增 crate `crates/sadp-gui`（二进制 `sadp-discover-gui`），**不改核心**：GUI 只消费
+`ScanEvent`、`DeviceStore`、`view::visible_indices` 与同一份 locale 文件。
+
+| 里程碑 | 状态 | 说明 |
+|---|---|---|
+| G0 状态复用 | ✅ 已有基础 | 排序/过滤/可见行早在 `sadp_core::view`，TUI 与 GUI 共用；导出格式化逻辑在 GUI 侧独立实现（CLI 的 `output` 尚未抽公共层） |
+| G1 壳与扫描 | ✅ | `eframe` 窗口 + 扫描线程（`Scanner::poll(200ms)` → crossbeam 通道 → UI drain），暂停/继续 = 停线程/起线程 |
+| G2 表格与详情 | ✅ 基础版 | `egui_extras::TableBuilder` 表格（IP/MAC/型号/来源/激活）、右侧详情、点选行、过滤框、排序键与方向、状态栏与 toast |
+| G3 设置与导出 | 🟡 部分 | 已有 JSON/CSV 导出（写当前目录）与剪贴板复制；网卡/地址族多选与文件对话框（`rfd`）未做，参数走命令行 |
+| G4 体验 | 🟡 部分 | 中文字体已用 `fontdb` 从系统注入（macOS 取 PingFang SC 的 TTC face index），深色主题/字体回退顺序未细调 |
+| G5 打包 | ⬜ 未开始 | `.app` 打包与签名公证、Windows MSI |
+
+偏差记录：
+
+1. **eframe 固定 0.33**：0.37 把 `App::update` 换成了 `App::ui(&mut Ui)` 并重构了 panel API，
+   迁移成本单列；0.33 仍是 `update(ctx, frame)` 的稳定形态。
+2. **日志模块与 CLI 重复**（`sadp-gui/src/logging.rs`）：抽公共 crate 前先复制，避免为一期功能动 CLI。
+3. **导出无文件对话框**：直接写当前工作目录并提示路径，省一层依赖；代价是“另存为”体验缺失。
+4. **GUI 可离屏测试**：`App::draw(&mut Context)` 与 eframe 解耦，测试用 `MockTransport` + 真实报文 fixture
+   跑完整 UI pass，在没有窗口的 CI 里也能验证不 panic、事件确实进入 `DeviceStore`。
+
+测试：`sadp-gui` 6 个（导出 4 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过；
+`cargo clippy --workspace --all-targets -- -D warnings` 与 `cargo fmt --check` 通过。
+
+### 13.6 建议的下一步
 
 1. 抓 2–3 台真机的 `Probe`/`ProbeMatch`（v4 与 v6 各一组），替换/补充 `tests/fixtures/`。
 2. 用 `--save-raw` 与 Wireshark 完成 M2b 的 IPv6 组地址确认，把结论回填到 §2.4。
-3. 真机跑 Gate 1 的 9 条验收项。
-4. 在 macOS 14/15 真机上跑 Gate 2 清单（`docs/MACOS.md` §5），确认权限弹窗与组播行为。
+3. 真机跑 Gate 1 的 9 条验收项；macOS 14/15 真机跑 Gate 2 清单（`docs/MACOS.md` §5）。
+4. GUI G3：网卡/地址族多选、`rfd` 另存为、`sadp-core` 导出格式化抽公共层供 CLI/GUI 共用。

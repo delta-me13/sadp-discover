@@ -164,6 +164,15 @@ error:
   hint:
     no_sadp_packets: "没有收到任何 SADP 响应。请确认设备与主机在同一二层网段，且防火墙放行 UDP 37020。"
     macos_local_network: "没有收到任何 SADP 响应。macOS 15+ 需要在「系统设置 → 隐私与安全性 → 本地网络」中允许当前终端。"
+gui:
+  action:
+    scan: 开始扫描
+    pause: 暂停
+    export_json: 导出 JSON
+    export_csv: 导出 CSV
+    copy: 复制
+    lang: 语言
+
 lang:
   en: English
   zh: 简体中文

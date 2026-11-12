@@ -22,6 +22,8 @@
 | M5 | `scan` / `interfaces` / `completions`、JSON / CSV、退出码 | ✅ |
 | M5b | 中英双语（CLI 帮助、TUI、错误提示、key 对齐测试） | ✅ |
 | M6 | 真机矩阵、打包 | 待真机 |
+| 二阶段 | macOS 适配 + Gate 2 验收 | ✅ 11/12（第 12 项 24h 连续性暂缓，工具链就绪） |
+| 三阶段 G1/G2 | egui 图形界面：窗口、扫描、表格、详情、过滤、排序、导出、复制、语言切换 | ✅ 起步可用（G3–G5 见路线图） |
 
 > **IPv6 说明（重要）**：SADP 的 IPv6 探测组播地址没有公开资料。当前实现按候选组
 > `ff02::1` 发送，可用 `--v6-mcast` 覆盖。若抓包证明设备不响应 IPv6 探测，
@@ -40,6 +42,10 @@ cargo build --release -p sadp-cli
 # macOS 通用二进制（arm64 + x86_64，需在 Mac 上运行）
 bash scripts/build-macos-universal.sh
 # 产物：dist/sadp-discover-<version>-macos-universal.tar.gz
+
+# 图形界面（三阶段，egui）
+cargo build --release -p sadp-gui
+# 产物：target/release/sadp-discover-gui
 ```
 
 macOS 的权限、签名与公证说明见 [docs/MACOS.md](docs/MACOS.md)。
@@ -55,6 +61,11 @@ sadp-discover --family v6 --no-tui  # 仅 IPv6，纯文本
 sadp-discover --passive             # 只监听设备主动通告
 sadp-discover interfaces            # 网卡列表 + 每个地址族的组播加入结果
 sadp-discover completions powershell
+
+# 图形界面：同一套扫描引擎与事件契约，窗口里看表格/详情
+sadp-discover-gui                    # 启动即扫描，每秒一轮
+sadp-discover-gui --lang en-US       # 指定界面语言
+sadp-discover-gui --local-port 0     # 与官方 SADP 同机时避开 37020
 ```
 
 常用选项：

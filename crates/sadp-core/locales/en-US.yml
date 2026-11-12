@@ -167,6 +167,15 @@ error:
     no_sadp_packets: "No SADP responses received. Check that the device is on the same L2 segment and that the firewall allows UDP 37020."
     macos_local_network: "No SADP responses. On macOS 15+, allow this terminal under System Settings → Privacy & Security → Local Network."
 
+gui:
+  action:
+    scan: Scan
+    pause: Pause
+    export_json: Export JSON
+    export_csv: Export CSV
+    copy: Copy
+    lang: Language
+
 lang:
   en: English
   zh: 简体中文

@@ -5,6 +5,7 @@ members = [
     "crates/sadp-core",
     "crates/sadp-cli",
     "crates/sadp-fake-device",
+    "crates/sadp-gui",
 ]
 default-members = ["crates/sadp-cli"]
 

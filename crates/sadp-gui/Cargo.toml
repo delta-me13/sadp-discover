@@ -1,0 +1,31 @@
+[package]
+name = "sadp-gui"
+description = "sadp-discover 图形界面（egui，三阶段）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sadp-discover-gui"
+path = "src/main.rs"
+
+[dependencies]
+sadp-core = { workspace = true }
+sadp-net = { workspace = true }
+clap = { workspace = true }
+eframe = "0.33"
+egui_extras = "0.33"
+fontdb = "0.24"
+anyhow = { workspace = true }
+crossbeam-channel = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+dirs = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+
+[lints]
+workspace = true
