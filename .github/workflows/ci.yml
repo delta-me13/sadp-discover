@@ -52,13 +52,12 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+  # 假设备端到端只在 Windows runner 上跑：macOS 15+ 的本地网络权限在托管 runner 上
+  # 没人去点"允许"，组播收不到回包（同一用例连续两轮都失败，见 run 43256691672）。
+  # 真机 macOS 上该用例是通过的（Gate 2 用假设备验证过），属环境限制而非代码回归。
   e2e:
-    name: e2e (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
+    name: e2e (windows)
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
