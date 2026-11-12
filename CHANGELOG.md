@@ -18,6 +18,7 @@
 ### Fixed
 
 - macOS 上「0 设备」不再固定误报本地网络权限：只有探测包发不出去时才提示权限（Gate 2 观察项 F2）
+- Windows 上 GUI 无法构建：`wgpu-hal 30` 的 D3D12 绑定与 `windows 0.62.2` 不兼容，Windows 改用 glow 后端
 
 ### Changed
 

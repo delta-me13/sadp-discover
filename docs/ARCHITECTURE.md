@@ -725,6 +725,10 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
 3. **导出无文件对话框**：直接写当前工作目录并提示路径，省一层依赖；代价是“另存为”体验缺失。
 4. **GUI 可离屏测试**：`App::draw(&mut Ui)` 与 eframe 解耦，测试用 `Context::run_ui` + `MockTransport`
    + 真实报文 fixture 跑完整 UI pass，在没有窗口的 CI 里也能验证不 panic、事件确实进入 `DeviceStore`。
+5. **Windows 单独用 glow 后端**：eframe 0.37 默认走 wgpu，而 `wgpu-hal 30.0.1` 的 D3D12 绑定与
+   `windows 0.62.2` 不兼容（`fontique` 要求 ≥0.62.2，无法降级），Windows 上 `wgpu-hal` 直接编译失败
+   （CI run 43245594522）。`sadp-gui` 因此按 target 拆分依赖：Windows 关默认特性、启用 glow；
+   macOS/Linux 保持默认 wgpu。上游修好后删掉 Cargo.toml 里的 Windows 块即可。
 
 测试：`sadp-gui` 6 个（导出 4 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 111 个）；
 `cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt --check`、`cargo deny check` 通过。

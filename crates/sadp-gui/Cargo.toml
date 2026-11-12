@@ -15,7 +15,6 @@ path = "src/main.rs"
 sadp-core = { workspace = true }
 sadp-net = { workspace = true }
 clap = { workspace = true }
-eframe = "0.37"
 egui_extras = "0.37"
 fontdb = "0.24"
 anyhow = { workspace = true }
@@ -27,6 +26,21 @@ dirs = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
+
+# macOS / Linux：沿用 eframe 默认后端（wgpu），与上游默认一致。
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+eframe = "0.37"
+
+# Windows：wgpu 30 的 D3D12 绑定与 windows 0.62.2 不兼容（wgpu-hal 编译失败，
+# 见 CI run 43245594522），改用 glow（OpenGL）后端规避；等上游修复后可去掉该块。
+[target.'cfg(target_os = "windows")'.dependencies]
+eframe = { version = "0.37", default-features = false, features = [
+  "accesskit",
+  "clipboard",
+  "default_fonts",
+  "glow",
+  "links",
+] }
 
 [lints]
 workspace = true
