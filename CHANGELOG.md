@@ -13,7 +13,7 @@
 - `Transport::sent_packets()`：累计成功发出的数据报数，用于区分「发不出去」与「没人回」
 - 24h 连续性压测脚本（`.gate2/soak/`）：电源门禁、caffeinate、采样与自动裁决
 - `LICENSE-MIT` / `LICENSE-APACHE`、`CHANGELOG.md`、`deny.toml`（依赖许可 / 漏洞 / 来源审计）
-- CI：`macos-14` / `macos-15` 双版本矩阵，CLI + GUI release 产物上传，`cargo-deny` job
+- CI：`macos-15` / `macos-latest`(26) 双版本矩阵，按 OS 只构建一次 release 产物，`cargo-deny` job
 
 ### Fixed
 

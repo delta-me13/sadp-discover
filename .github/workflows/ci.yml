@@ -10,15 +10,16 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  # 只做检查与测试，不产出 release 产物；产物统一由下面两个 job 负责，避免重复构建。
   test:
-    name: ${{ matrix.os }}
+    name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # macos-14 / macos-15 = Apple Silicon 两代系统。Intel 由下面的交叉检查
-        # 与通用二进制构建覆盖，避免依赖已逐步下线的 Intel runner。
-        os: [windows-latest, macos-14, macos-15]
+        # macos-15 与 macos-latest(=macos-26) 覆盖两代系统；
+        # Intel 由交叉检查与通用二进制构建覆盖（macos-14 镜像已于 2026-10 退役）。
+        os: [windows-latest, macos-15, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -46,16 +47,13 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Build release binaries (CLI + GUI)
-        run: cargo build --release -p sadp-cli -p sadp-gui
-
   e2e:
     name: e2e (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-14]
+        os: [windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -70,48 +68,10 @@ jobs:
       - name: Fake device end-to-end
         run: cargo test -p sadp-fake-device -- --ignored --nocapture
 
-  macos-universal:
-    name: macOS universal binary
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build universal binary
-        run: bash scripts/build-macos-universal.sh
-
-      - name: Verify architectures
-        run: |
-          lipo -info dist/sadp-discover
-          file dist/sadp-discover
-
-      - name: Smoke test (native arm64)
-        run: |
-          ./dist/sadp-discover --version
-          # 不要直接管道给 head：Rust 默认忽略 SIGPIPE，管道提前关闭会让进程报错。
-          ./dist/sadp-discover interfaces --json > interfaces.json
-          head -20 interfaces.json
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sadp-discover-macos-universal
-          path: dist/sadp-discover-*.tar.gz
-          if-no-files-found: error
-
-  artifacts:
-    name: release artifacts (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-14]
+  # Windows 产物：CLI + GUI。macOS 的产物在 macos-universal 里一起出，避免两个 macOS 构建 job。
+  release-windows:
+    name: release (windows)
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -124,18 +84,60 @@ jobs:
       - name: Build release binaries
         run: cargo build --release -p sadp-cli -p sadp-gui
 
-      - name: Smoke test CLI
-        shell: bash
-        run: ./target/release/sadp-discover${{ matrix.os == 'windows-latest' && '.exe' || '' }} --version
+      - name: Smoke test
+        run: |
+          .\target\release\sadp-discover.exe --version
+          .\target\release\sadp-discover-gui.exe --version
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sadp-discover-${{ matrix.os }}
+          name: sadp-discover-windows-msvc
           path: |
-            target/release/sadp-discover
             target/release/sadp-discover.exe
-            target/release/sadp-discover-gui
             target/release/sadp-discover-gui.exe
+          if-no-files-found: error
+
+  # macOS 产物：CLI 通用二进制（arm64 + x86_64）+ GUI（arm64）。
+  macos-universal:
+    name: release (macOS universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build universal CLI
+        run: bash scripts/build-macos-universal.sh
+
+      - name: Build GUI (arm64)
+        run: cargo build --release -p sadp-gui
+
+      - name: Verify architectures
+        run: |
+          lipo -info dist/sadp-discover
+          file dist/sadp-discover
+          file target/release/sadp-discover-gui
+
+      - name: Smoke test
+        run: |
+          ./dist/sadp-discover --version
+          ./target/release/sadp-discover-gui --version
+          # 不要直接管道给 head：Rust 默认忽略 SIGPIPE，管道提前关闭会让进程报错。
+          ./dist/sadp-discover interfaces --json > interfaces.json
+          head -20 interfaces.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sadp-discover-macos-universal
+          path: |
+            dist/sadp-discover-*.tar.gz
+            target/release/sadp-discover-gui
           if-no-files-found: error
 
   deny:

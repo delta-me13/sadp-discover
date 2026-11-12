@@ -136,7 +136,7 @@ xcrun notarytool submit dist/notarize.zip --keychain-profile sadp-notary --wait
 
 ## 6. 已知限制
 
-- 本仓库的 CI 在 `macos-14`（Apple Silicon）上跑构建与单元测试，并额外交叉检查 `x86_64-apple-darwin`；Intel 的运行期行为**仍需真机**。组播行为无法自动化验证。
+- 本仓库的 CI 在 `macos-15` 与 `macos-latest`（Apple Silicon）上跑构建与单元测试，并额外交叉检查 `x86_64-apple-darwin`；Intel 的运行期行为**仍需真机**。组播行为无法自动化验证。`macos-14` 镜像已于 2026-10 被 GitHub 退役，任务会被直接取消。
 - 官方 SADP 工具没有 macOS 版，因此不存在「抢 37020」的兼容性场景；但仍保留端口回退逻辑。
 - macOS 上 Wi-Fi 与有线同时接入同一网段时，同一设备可能从两个接口各回一包；
   去重逻辑会合并为一行，`seen_on` 会列出两个网卡。

@@ -521,7 +521,7 @@ error.net.bind: "无法绑定 UDP 端口 %{port}：%{reason}"
 | 本地网络权限 | macOS 15+ 首次发包触发"本地网络"隐私弹窗；CLI 继承终端授权，GUI 需 `Info.plist` 的 `NSLocalNetworkUsageDescription` |
 | 沙盒/分发 | 仅 App Store 沙盒需要 `com.apple.developer.networking.multicast`；Developer ID 分发不需要，但要签名 + 公证 |
 | 通用二进制 | `aarch64-apple-darwin` + `x86_64-apple-darwin` 分别构建后 `lipo`，或用 cargo-dist 的 universal 目标 |
-| CI | `macos-14`（arm64）跑测试 + `x86_64-apple-darwin` 交叉检查；通用二进制构建 |
+| CI | `macos-15` / `macos-latest`（arm64）跑测试 + `x86_64-apple-darwin` 交叉检查；通用二进制构建 |
 | 路径 | 配置/日志走 `~/Library/Application Support/sadp-discover/` |
 
 **Gate 2**：macOS 14/15、Apple Silicon 与 Intel 各一台，clean 环境下 TUI 全功能（含中英文切换）可用；首次权限弹窗有文档说明。
@@ -693,7 +693,7 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
 | 平台差异收敛 | 无需平台专用 socket 代码：接收用通配地址，出口用 `IP_MULTICAST_IF`；`IP_BOUND_IF` 按设计不引入（理由见 `docs/MACOS.md`） |
 | 权限诊断 | 新增「0 设备 + 0 个 SADP 响应报文」判定，macOS 上给出本地网络权限提示，其它平台给防火墙提示 |
 | 通用二进制 | `scripts/build-macos-universal.sh`（双架构构建 + lipo + 可选签名/公证） |
-| CI | `macos-14` / `macos-15`（Apple Silicon）测试矩阵 + `x86_64-apple-darwin` 交叉检查；通用二进制、CLI+GUI release 产物上传、`cargo-deny` 依赖审计 |
+| CI | `macos-15` / `macos-latest`（Apple Silicon）测试矩阵 + `x86_64-apple-darwin` 交叉检查；每个 OS 只构建一次 release 产物（Windows CLI+GUI、macOS 通用 CLI + GUI）、`cargo-deny` 依赖审计 |
 | 文档 | `docs/MACOS.md`：权限、签名、公证、Gate 2 清单、故障排查 |
 | 真实报文 | 现场设备（DS-2DE4423DW-D/GLT/XM）抓包脱敏为 `tests/fixtures/probe_match_real_ds2de.xml` |
 | 型号展示 | 部分固件 `DeviceType` 是数字编码（196607），展示时回退到 `DeviceDescription`（表格/详情/导出），JSON 保留原始字段 |
