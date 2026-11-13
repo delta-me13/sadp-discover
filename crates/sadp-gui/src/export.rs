@@ -1,84 +1,46 @@
-//! 导出与复制：字段语义与 CLI 的 JSON/CSV 输出保持一致，方便脚本复用。
+//! GUI 导出：设备字段来自 `sadp_core::export`，与 CLI 的 JSON/CSV 完全一致；
+//! 根对象额外带 `frontend`，方便区分手工导出与 `--json`。
 
-use sadp_core::Device;
+use std::time::Duration;
 
-/// JSON：schema 为 sadp.discover/v1，额外带 generated_at 便于留档。
-pub fn json(devices: &[Device]) -> serde_json::Result<String> {
+use sadp_core::export::{self, DeviceJson};
+use sadp_core::{Device, Family, JSON_SCHEMA};
+
+/// 导出时写入根对象的扫描元信息。
+pub struct Meta<'a> {
+    pub port: u16,
+    pub families: &'a [Family],
+    pub elapsed: Duration,
+    pub rounds: u64,
+}
+
+/// JSON：schema 为 `sadp.discover/v1`，设备对象的字段顺序与 CLI 相同。
+pub fn json(devices: &[Device], meta: &Meta<'_>) -> serde_json::Result<String> {
     let value = serde_json::json!({
-        "schema": sadp_core::JSON_SCHEMA,
+        "schema": JSON_SCHEMA,
         "tool": "sadp-discover",
         "frontend": "gui",
         "version": sadp_core::VERSION,
         "generated_at": now_rfc3339(),
+        "elapsed_ms": meta.elapsed.as_millis() as u64,
+        "port": meta.port,
+        "families": meta.families.iter().map(|f| f.as_str()).collect::<Vec<_>>(),
+        "rounds": meta.rounds,
         "count": devices.len(),
-        "devices": devices,
+        "devices": devices.iter().map(DeviceJson::from_device).collect::<Vec<_>>(),
     });
     serde_json::to_string_pretty(&value)
 }
 
-/// CSV：表头固定英文，字段与 CLI 的 --csv 一致。
-pub fn csv(devices: &[Device]) -> String {
-    let mut out = String::from(
-        "ipv4,mac,model,sn,description,firmware,netmask,gateway,dhcp,sdk_port,http_port,ipv6,via\n",
-    );
-    for d in devices {
-        let cells = [
-            d.ipv4.map(|ip| ip.to_string()).unwrap_or_default(),
-            d.mac.map(|m| m.to_string()).unwrap_or_default(),
-            d.display_model().unwrap_or_default().to_string(),
-            d.sn.clone().unwrap_or_default(),
-            d.description.clone().unwrap_or_default(),
-            d.firmware.clone().unwrap_or_default(),
-            d.netmask.map(|ip| ip.to_string()).unwrap_or_default(),
-            d.gateway.map(|ip| ip.to_string()).unwrap_or_default(),
-            d.dhcp.map(|v| v.to_string()).unwrap_or_default(),
-            d.sdk_port.map(|p| p.to_string()).unwrap_or_default(),
-            d.http_port.map(|p| p.to_string()).unwrap_or_default(),
-            d.ipv6
-                .iter()
-                .map(|e| e.addr.to_string())
-                .collect::<Vec<_>>()
-                .join(" "),
-            via_label(d).to_string(),
-        ];
-        let line: Vec<String> = cells.iter().map(|c| csv_cell(c)).collect();
-        out.push_str(&line.join(","));
-        out.push('\n');
-    }
-    out
+/// CSV：表头与 `sadp-discover --csv` 完全一致。
+pub fn csv(devices: &[Device]) -> std::io::Result<String> {
+    export::csv_string(devices)
 }
 
-/// 复制到剪贴板：一行一台，制表符分隔，粘进 Excel 或聊天窗口都不散。
+/// 复制到剪贴板：一行一台，制表符分隔。
+#[must_use]
 pub fn clipboard(devices: &[Device]) -> String {
-    devices
-        .iter()
-        .map(|d| {
-            format!(
-                "{}\t{}\t{}\t{}",
-                d.primary_ip(),
-                d.mac.map(|m| m.to_string()).unwrap_or_else(|| "-".into()),
-                d.display_model().unwrap_or("-"),
-                via_label(d)
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-pub fn via_label(device: &Device) -> &'static str {
-    match device.seen_via {
-        sadp_core::SeenVia::V4 => "v4",
-        sadp_core::SeenVia::V6 => "v6",
-        sadp_core::SeenVia::Both => "both",
-    }
-}
-
-fn csv_cell(value: &str) -> String {
-    if value.contains([',', '"', '\n']) {
-        format!("\"{}\"", value.replace('"', "\"\""))
-    } else {
-        value.to_string()
-    }
+    export::clipboard(devices)
 }
 
 fn now_rfc3339() -> String {
@@ -90,7 +52,6 @@ fn now_rfc3339() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sadp_core::Device;
 
     fn sample() -> Device {
         let mut device = Device::fresh();
@@ -104,16 +65,18 @@ mod tests {
     }
 
     #[test]
-    fn csv_has_stable_header_and_row() {
-        let text = csv(&[sample()]);
+    fn csv_uses_the_cli_header() {
+        let text = csv(&[sample()]).unwrap();
         let mut lines = text.lines();
         assert_eq!(
             lines.next().unwrap(),
-            "ipv4,mac,model,sn,description,firmware,netmask,gateway,dhcp,sdk_port,http_port,ipv6,via"
+            "sn,mac,ipv4,netmask,gateway,ipv6,ipv6_masklen,dhcp,model,description,firmware,\
+             sdk_port,http_port,activated,reset_ability,analog_channels,digital_channels,\
+             support,seen_via,seen_on"
         );
         let row = lines.next().unwrap();
-        assert!(row.starts_with("192.168.1.10,aa:bb:cc:dd:ee:ff,DS-2CD2T47G2-L,DS-TEST-0001,"));
-        assert!(row.ends_with(",v4"));
+        assert!(row.starts_with("DS-TEST-0001,aa:bb:cc:dd:ee:ff,192.168.1.10,"));
+        assert!(row.ends_with(",v4,"), "got: {row}");
         assert_eq!(lines.count(), 0);
     }
 
@@ -121,7 +84,7 @@ mod tests {
     fn csv_quotes_commas_and_quotes() {
         let mut device = sample();
         device.description = Some("a,b\"c".to_string());
-        let text = csv(&[device]);
+        let text = csv(&[device]).unwrap();
         assert!(text.contains("\"a,b\"\"c\""), "got: {text}");
     }
 
@@ -134,12 +97,24 @@ mod tests {
     }
 
     #[test]
-    fn json_carries_schema_and_count() {
-        let text = json(&[sample()]).unwrap();
+    fn json_carries_schema_metadata_and_shared_device_fields() {
+        let meta = Meta {
+            port: 37020,
+            families: &[Family::V4, Family::V6],
+            elapsed: Duration::from_millis(1200),
+            rounds: 3,
+        };
+        let text = json(&[sample()], &meta).unwrap();
         let value: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(value["schema"], sadp_core::JSON_SCHEMA);
-        assert_eq!(value["count"], 1);
         assert_eq!(value["frontend"], "gui");
+        assert_eq!(value["count"], 1);
+        assert_eq!(value["port"], 37020);
+        assert_eq!(value["families"][0], "v4");
+        assert_eq!(value["rounds"], 3);
+        assert_eq!(value["elapsed_ms"], 1200);
         assert_eq!(value["devices"][0]["sn"], "DS-TEST-0001");
+        assert_eq!(value["devices"][0]["seen_via"], "v4");
+        assert!(value["devices"][0]["first_seen_ago_ms"].is_number());
     }
 }

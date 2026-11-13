@@ -10,8 +10,9 @@ use std::time::Duration;
 use serde::Serialize;
 use unicode_width::UnicodeWidthStr;
 
+use sadp_core::export::{DeviceJson, write_csv as write_csv_rows};
 use sadp_core::i18n::{tr, tr_args};
-use sadp_core::{Device, Family, JSON_SCHEMA, Session};
+use sadp_core::{Family, JSON_SCHEMA, Session};
 
 /// 输出所需的扫描元信息。
 #[derive(Clone, Debug)]
@@ -35,97 +36,6 @@ impl Meta {
 }
 
 #[derive(Debug, Serialize)]
-struct JsonIpv6 {
-    address: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    scope_id: Option<u32>,
-    global: bool,
-}
-
-#[derive(Debug, Serialize)]
-struct JsonDevice {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sn: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    mac: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    ipv4: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    netmask: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    gateway: Option<String>,
-    ipv6: Vec<JsonIpv6>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    ipv6_masklen: Option<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    dhcp: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    model: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    firmware: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sdk_port: Option<u16>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    http_port: Option<u16>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    activated: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    reset_ability: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    analog_channels: Option<u16>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    digital_channels: Option<u16>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    support: Option<String>,
-    seen_via: String,
-    seen_on: Vec<String>,
-    first_seen_ago_ms: u64,
-    last_seen_ago_ms: u64,
-    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    extra: std::collections::BTreeMap<String, String>,
-}
-
-impl JsonDevice {
-    fn from_device(d: &Device) -> Self {
-        Self {
-            sn: d.sn.clone(),
-            mac: d.mac.map(|m| m.to_string()),
-            ipv4: d.ipv4.map(|i| i.to_string()),
-            netmask: d.netmask.map(|i| i.to_string()),
-            gateway: d.gateway.map(|i| i.to_string()),
-            ipv6: d
-                .ipv6
-                .iter()
-                .map(|e| JsonIpv6 {
-                    address: e.addr.to_string(),
-                    scope_id: e.scope_id,
-                    global: e.global,
-                })
-                .collect(),
-            ipv6_masklen: d.ipv6_masklen,
-            dhcp: d.dhcp,
-            model: d.model.clone(),
-            description: d.description.clone(),
-            firmware: d.firmware.clone(),
-            sdk_port: d.sdk_port,
-            http_port: d.http_port,
-            activated: d.activated,
-            reset_ability: d.reset_ability,
-            analog_channels: d.analog_channels,
-            digital_channels: d.digital_channels,
-            support: d.support.clone(),
-            seen_via: d.seen_via.as_str().to_string(),
-            seen_on: d.seen_on.clone(),
-            first_seen_ago_ms: d.first_seen.elapsed().as_millis() as u64,
-            last_seen_ago_ms: d.last_seen.elapsed().as_millis() as u64,
-            extra: d.extra.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
 struct JsonRoot {
     schema: &'static str,
     tool: &'static str,
@@ -136,7 +46,7 @@ struct JsonRoot {
     families: Vec<&'static str>,
     rounds: u64,
     count: usize,
-    devices: Vec<JsonDevice>,
+    devices: Vec<DeviceJson>,
 }
 
 #[must_use]
@@ -160,81 +70,15 @@ pub fn write_json<W: Write>(w: &mut W, session: &Session, meta: &Meta) -> io::Re
         devices: session
             .devices()
             .iter()
-            .map(JsonDevice::from_device)
+            .map(DeviceJson::from_device)
             .collect(),
     };
     serde_json::to_writer_pretty(&mut *w, &root)?;
     writeln!(w)
 }
 
-#[derive(Debug, Serialize)]
-struct CsvRow {
-    sn: String,
-    mac: String,
-    ipv4: String,
-    netmask: String,
-    gateway: String,
-    ipv6: String,
-    ipv6_masklen: String,
-    dhcp: String,
-    model: String,
-    description: String,
-    firmware: String,
-    sdk_port: String,
-    http_port: String,
-    activated: String,
-    reset_ability: String,
-    analog_channels: String,
-    digital_channels: String,
-    support: String,
-    seen_via: String,
-    seen_on: String,
-}
-
-impl CsvRow {
-    fn from_device(d: &Device) -> Self {
-        let opt = |v: &Option<String>| v.clone().unwrap_or_default();
-        Self {
-            sn: opt(&d.sn),
-            mac: d.mac.map(|m| m.to_string()).unwrap_or_default(),
-            ipv4: d.ipv4.map(|i| i.to_string()).unwrap_or_default(),
-            netmask: d.netmask.map(|i| i.to_string()).unwrap_or_default(),
-            gateway: d.gateway.map(|i| i.to_string()).unwrap_or_default(),
-            ipv6: d
-                .ipv6
-                .iter()
-                .map(|e| e.addr.to_string())
-                .collect::<Vec<_>>()
-                .join(";"),
-            ipv6_masklen: d.ipv6_masklen.map(|v| v.to_string()).unwrap_or_default(),
-            dhcp: d.dhcp.map(|v| v.to_string()).unwrap_or_default(),
-            model: opt(&d.model),
-            description: opt(&d.description),
-            firmware: opt(&d.firmware),
-            sdk_port: d.sdk_port.map(|v| v.to_string()).unwrap_or_default(),
-            http_port: d.http_port.map(|v| v.to_string()).unwrap_or_default(),
-            activated: d.activated.map(|v| v.to_string()).unwrap_or_default(),
-            reset_ability: d.reset_ability.map(|v| v.to_string()).unwrap_or_default(),
-            analog_channels: d.analog_channels.map(|v| v.to_string()).unwrap_or_default(),
-            digital_channels: d
-                .digital_channels
-                .map(|v| v.to_string())
-                .unwrap_or_default(),
-            support: opt(&d.support),
-            seen_via: d.seen_via.as_str().to_string(),
-            seen_on: d.seen_on.join(";"),
-        }
-    }
-}
-
 pub fn write_csv<W: Write>(w: W, session: &Session) -> io::Result<()> {
-    let mut writer = csv::WriterBuilder::new().from_writer(w);
-    for device in session.devices() {
-        writer
-            .serialize(CsvRow::from_device(device))
-            .map_err(|e| io::Error::other(e.to_string()))?;
-    }
-    writer.flush()
+    write_csv_rows(w, session.devices())
 }
 
 /// 纯文本表格。`width` 是终端列数（非 TTY 时用 120）。

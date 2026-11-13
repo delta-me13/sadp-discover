@@ -183,6 +183,29 @@ gui:
     export_csv: Export CSV
     copy: Copy
     lang: Language
+    settings: Settings
+    theme_light: Light theme
+    theme_dark: Dark theme
+  export:
+    save_as: Save as
+  settings:
+    title: Scan settings
+    interfaces: Interfaces
+    families: Address families
+    timeout: Scan window
+    repeat: Repeat interval
+    port: UDP port
+    hint: Applying stops the current scan and restarts it with the new settings.
+    apply: Apply
+    cancel: Cancel
+    select_all: Select all
+    select_none: Clear
+    applied: Settings applied; scanning restarted
+    error:
+      family: Select at least one address family
+      interface: Select at least one interface
+      invalid: "Invalid settings: %{reason}"
+      rebind: "Rebind failed: %{reason}"
   tip:
     open_web: Double-click the IP to open the device web UI in your browser
   status:

@@ -5,6 +5,7 @@
 
 rust_i18n::i18n!("locales", fallback = "en-US");
 
+pub mod export;
 pub mod i18n;
 pub mod proto;
 pub mod scan;

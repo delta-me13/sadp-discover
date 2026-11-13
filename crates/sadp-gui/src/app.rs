@@ -3,6 +3,7 @@
 //! 设计约束（见 docs/ARCHITECTURE.md ADR-004）：GUI 只消费 sadp-core 的 ScanEvent 与 view 视图函数，
 //! 扫描线程、去重、合并、国际化全部复用，不在 UI 层重写。
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -12,9 +13,39 @@ use eframe::egui;
 use egui_extras::{Column, TableBuilder};
 use sadp_core::scan::{ScanConfig, ScanEvent, Scanner, Session};
 use sadp_core::view::{SortKey, ViewOptions, visible_indices};
-use sadp_core::{Device, Lang, Transport, tr, tr_args};
+use sadp_core::{Device, Family, InterfaceInfo, Lang, Transport, tr, tr_args};
+use sadp_net::{InterfaceSelector, enumerate_interfaces};
 
 use crate::{browser, export};
+
+/// 设置变更后重建传输层；`None` 表示沿用现有 transport（测试用 MockTransport）。
+pub type TransportFactory =
+    Arc<dyn Fn(&ScanConfig) -> anyhow::Result<Arc<dyn Transport>> + Send + Sync>;
+
+/// 深/浅两套配色。默认深色，切换只影响当前会话。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Theme {
+    Dark,
+    Light,
+}
+
+impl Theme {
+    const fn toggle(self) -> Self {
+        match self {
+            Self::Dark => Self::Light,
+            Self::Light => Self::Dark,
+        }
+    }
+
+    fn apply(self, ctx: &egui::Context) {
+        // egui 0.37 由「主题偏好」统一管理配色；直接 set_visuals 会在下一帧被覆盖。
+        let preference = match self {
+            Self::Dark => egui::ThemePreference::Dark,
+            Self::Light => egui::ThemePreference::Light,
+        };
+        ctx.set_theme(preference);
+    }
+}
 
 /// 扫描线程发回主线程的消息。
 enum Msg {
@@ -77,6 +108,7 @@ impl Drop for Worker {
 pub struct App {
     cfg: ScanConfig,
     transport: Arc<dyn Transport>,
+    factory: Option<TransportFactory>,
     worker: Option<Worker>,
     session: Session,
     view: ViewOptions,
@@ -84,18 +116,53 @@ pub struct App {
     selected: Option<String>,
     lang: Lang,
     toast: Option<(String, Instant)>,
+    show_settings: bool,
+    ifaces: Vec<InterfaceInfo>,
+    iface_sel: BTreeSet<String>,
+    fam_v4: bool,
+    fam_v6: bool,
+    timeout_ms: u64,
+    repeat_ms: u64,
+    port: u16,
+    theme: Theme,
 }
 
 impl App {
-    pub fn new(ctx: &egui::Context, cfg: ScanConfig, transport: Arc<dyn Transport>) -> Self {
+    pub fn new(
+        ctx: &egui::Context,
+        cfg: ScanConfig,
+        transport: Arc<dyn Transport>,
+        factory: Option<TransportFactory>,
+    ) -> Self {
         crate::fonts::install(ctx);
-        let view = ViewOptions::default();
+        let theme = Theme::Dark;
+        theme.apply(ctx);
+
+        // 设置面板的初始值来自实际生效的配置；Auto 会展开成当前可用网卡。
+        let ifaces = enumerate_interfaces(&InterfaceSelector::All).unwrap_or_default();
+        let iface_sel = enumerate_interfaces(&cfg.interfaces)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|iface| iface.name)
+            .collect();
+
         let mut app = Self {
+            fam_v4: cfg.families.contains(&Family::V4),
+            fam_v6: cfg.families.contains(&Family::V6),
+            timeout_ms: u64::try_from(cfg.timeout.as_millis()).unwrap_or(3000),
+            repeat_ms: u64::try_from(cfg.repeat.unwrap_or(Duration::from_secs(1)).as_millis())
+                .unwrap_or(1000),
+            port: cfg.port,
+            ifaces,
+            iface_sel,
+            show_settings: false,
+            factory,
+            theme,
             cfg,
             transport,
             worker: None,
             session: Session::new(),
-            view,
+            view: ViewOptions::default(),
             filter: String::new(),
             selected: None,
             lang: sadp_core::i18n::current(),
@@ -154,28 +221,44 @@ impl App {
     }
 
     fn export(&mut self, json: bool) {
-        let result = (|| -> anyhow::Result<String> {
-            let body = if json {
-                export::json(self.session.devices())?
-            } else {
-                export::csv(self.session.devices())
-            };
-            let name = format!(
-                "sadp-discover-gui-{}.{}",
-                stamp(),
-                if json { "json" } else { "csv" }
-            );
-            std::fs::write(&name, body)?;
-            Ok(name)
-        })();
-        match result {
-            Ok(path) => {
-                tracing::info!(%path, "已导出");
-                self.set_toast(tr_args("tui.status.exported", &[("path", &path)]));
+        let ext = if json { "json" } else { "csv" };
+        let meta = export::Meta {
+            port: self.cfg.port,
+            families: &self.cfg.families,
+            elapsed: self.session.elapsed(),
+            rounds: self.session.round,
+        };
+        let body = if json {
+            export::json(self.session.devices(), &meta).map_err(|e| e.to_string())
+        } else {
+            export::csv(self.session.devices()).map_err(|e| e.to_string())
+        };
+        let body = match body {
+            Ok(body) => body,
+            Err(reason) => {
+                self.set_toast(tr_args("tui.export.failed", &[("reason", &reason)]));
+                return;
+            }
+        };
+
+        let default_name = format!("sadp-discover-gui-{}.{ext}", stamp());
+        let Some(path) = rfd::FileDialog::new()
+            .set_title(tr("gui.export.save_as"))
+            .set_file_name(default_name)
+            .add_filter(ext.to_uppercase(), &[ext])
+            .save_file()
+        else {
+            return; // 用户取消
+        };
+        let path_label = path.display().to_string();
+        match std::fs::write(&path, body) {
+            Ok(()) => {
+                tracing::info!(path = %path_label, "已导出");
+                self.set_toast(tr_args("tui.status.exported", &[("path", &path_label)]));
             }
             Err(err) => {
-                let message = err.to_string();
-                self.set_toast(tr_args("tui.export.failed", &[("reason", &message)]));
+                let reason = err.to_string();
+                self.set_toast(tr_args("tui.export.failed", &[("reason", &reason)]));
             }
         }
     }
@@ -213,11 +296,225 @@ impl App {
             }
         }
     }
+
+    /// 扫描设置：网卡多选、地址族、窗口/周期、端口。应用后重建传输层并重扫。
+    fn settings_window(&mut self, ctx: &egui::Context) {
+        if !self.show_settings {
+            return;
+        }
+        let mut open = true;
+        let mut apply = false;
+        let mut cancel = false;
+
+        // 本地编辑，点「应用」才写回；取消不会改配置。
+        let ifaces = self.ifaces.clone();
+        let mut selected = self.iface_sel.clone();
+        let mut fam_v4 = self.fam_v4;
+        let mut fam_v6 = self.fam_v6;
+        let mut timeout_ms = self.timeout_ms;
+        let mut repeat_ms = self.repeat_ms;
+        let mut port = self.port;
+
+        egui::Window::new(tr("gui.settings.title"))
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(true)
+            .default_width(520.0)
+            .show(ctx, |ui| {
+                ui.label(tr("gui.settings.interfaces"));
+                ui.horizontal(|ui| {
+                    if ui.button(tr("gui.settings.select_all")).clicked() {
+                        selected = ifaces.iter().map(|i| i.name.clone()).collect();
+                    }
+                    if ui.button(tr("gui.settings.select_none")).clicked() {
+                        selected.clear();
+                    }
+                });
+                egui::ScrollArea::vertical()
+                    .max_height(150.0)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        for iface in &ifaces {
+                            let mut checked = selected.contains(&iface.name);
+                            let label = format!("{}  {}", iface.name, iface_summary(iface));
+                            if ui.checkbox(&mut checked, label).changed() {
+                                if checked {
+                                    selected.insert(iface.name.clone());
+                                } else {
+                                    selected.remove(&iface.name);
+                                }
+                            }
+                        }
+                    });
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label(tr("gui.settings.families"));
+                    ui.checkbox(&mut fam_v4, "IPv4");
+                    ui.checkbox(&mut fam_v6, "IPv6");
+                });
+                ui.add(
+                    egui::Slider::new(&mut timeout_ms, 200..=60_000)
+                        .text(tr("gui.settings.timeout"))
+                        .suffix(" ms"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut repeat_ms, 200..=600_000)
+                        .text(tr("gui.settings.repeat"))
+                        .suffix(" ms"),
+                );
+                ui.horizontal(|ui| {
+                    ui.label(tr("gui.settings.port"));
+                    ui.add(egui::DragValue::new(&mut port).range(1..=65_535).speed(1));
+                });
+                ui.label(egui::RichText::new(tr("gui.settings.hint")).small());
+                ui.separator();
+                ui.horizontal(|ui| {
+                    let valid = !selected.is_empty() && (fam_v4 || fam_v6);
+                    if ui
+                        .add_enabled(valid, egui::Button::new(tr("gui.settings.apply")))
+                        .clicked()
+                    {
+                        apply = true;
+                    }
+                    if ui.button(tr("gui.settings.cancel")).clicked() {
+                        cancel = true;
+                    }
+                    if !fam_v4 && !fam_v6 {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(220, 120, 80),
+                            tr("gui.settings.error.family"),
+                        );
+                    } else if selected.is_empty() {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(220, 120, 80),
+                            tr("gui.settings.error.interface"),
+                        );
+                    }
+                });
+            });
+
+        self.show_settings = open && !cancel;
+        if apply {
+            match self.apply_settings(&selected, fam_v4, fam_v6, timeout_ms, repeat_ms, port) {
+                Ok(()) => {
+                    self.show_settings = false;
+                    self.set_toast(tr("gui.settings.applied"));
+                }
+                Err(message) => self.set_toast(message),
+            }
+        }
+    }
+
+    fn apply_settings(
+        &mut self,
+        selected: &BTreeSet<String>,
+        fam_v4: bool,
+        fam_v6: bool,
+        timeout_ms: u64,
+        repeat_ms: u64,
+        port: u16,
+    ) -> Result<(), String> {
+        if !fam_v4 && !fam_v6 {
+            return Err(tr("gui.settings.error.family"));
+        }
+        if selected.is_empty() {
+            return Err(tr("gui.settings.error.interface"));
+        }
+
+        // 与 CLI 的约束一致：窗口不能长于周期。
+        let repeat_ms = repeat_ms.clamp(200, 600_000);
+        let timeout_ms = timeout_ms.clamp(100, repeat_ms);
+        let mut cfg = self.cfg.clone();
+        cfg.port = port;
+        cfg.timeout = Duration::from_millis(timeout_ms);
+        cfg.repeat = Some(Duration::from_millis(repeat_ms));
+        cfg.families = match (fam_v4, fam_v6) {
+            (true, true) => vec![Family::V4, Family::V6],
+            (true, false) => vec![Family::V4],
+            _ => vec![Family::V6],
+        };
+        cfg.interfaces = selector_for(selected, &self.ifaces);
+        if let Err(err) = cfg.validate() {
+            let reason = err.to_string();
+            return Err(tr_args(
+                "gui.settings.error.invalid",
+                &[("reason", &reason)],
+            ));
+        }
+
+        self.stop_scan();
+        let rebound = match &self.factory {
+            Some(factory) => match factory(&cfg) {
+                Ok(transport) => Some(transport),
+                Err(err) => {
+                    // 绑定失败时按旧配置恢复，避免界面停在「已暂停」。
+                    let reason = err.to_string();
+                    self.worker =
+                        Some(Worker::spawn(self.cfg.clone(), Arc::clone(&self.transport)));
+                    return Err(tr_args("gui.settings.error.rebind", &[("reason", &reason)]));
+                }
+            },
+            None => None,
+        };
+        if let Some(transport) = rebound {
+            self.transport = transport;
+        }
+
+        self.cfg = cfg;
+        self.timeout_ms = timeout_ms;
+        self.repeat_ms = repeat_ms;
+        self.port = port;
+        self.fam_v4 = fam_v4;
+        self.fam_v6 = fam_v6;
+        self.iface_sel = selected.clone();
+        self.session = Session::new();
+        self.selected = None;
+        self.start_scan();
+        Ok(())
+    }
 }
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.draw(ui);
+    }
+}
+
+/// 选中的网卡正好等于「自动」范围时用 `Auto`，否则显式 `Only`。
+fn selector_for(selected: &BTreeSet<String>, ifaces: &[InterfaceInfo]) -> InterfaceSelector {
+    let non_loopback: BTreeSet<String> = ifaces
+        .iter()
+        .filter(|iface| !iface.loopback)
+        .map(|iface| iface.name.clone())
+        .collect();
+    let auto = if non_loopback.is_empty() {
+        ifaces.iter().map(|iface| iface.name.clone()).collect()
+    } else {
+        non_loopback
+    };
+    if *selected == auto {
+        InterfaceSelector::Auto
+    } else {
+        InterfaceSelector::Only(selected.iter().cloned().collect())
+    }
+}
+
+fn iface_summary(iface: &InterfaceInfo) -> String {
+    let mut parts = Vec::new();
+    if let Some(ip) = iface.ipv4 {
+        parts.push(ip.to_string());
+    }
+    for ip in iface.ipv6.iter().take(2) {
+        parts.push(ip.to_string());
+    }
+    if iface.loopback {
+        parts.push(tr("interfaces.loopback"));
+    }
+    if parts.is_empty() {
+        tr("common.none")
+    } else {
+        parts.join(", ")
     }
 }
 
@@ -230,7 +527,7 @@ impl App {
 
         egui::Panel::top("toolbar").show(ui, |ui| {
             ui.add_space(4.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 let scanning = self.is_scanning();
                 let label = if scanning {
                     tr("gui.action.pause")
@@ -261,6 +558,22 @@ impl App {
                     .clicked()
                 {
                     self.toggle_lang();
+                }
+
+                ui.separator();
+                if ui.button(tr("gui.action.settings")).clicked() {
+                    // 打开时刷新网卡列表，热插拔/新 VPN 不用重启程序。
+                    self.ifaces = enumerate_interfaces(&InterfaceSelector::All).unwrap_or_default();
+                    self.show_settings = true;
+                }
+                let theme_label = if self.theme == Theme::Dark {
+                    tr("gui.action.theme_light")
+                } else {
+                    tr("gui.action.theme_dark")
+                };
+                if ui.button(theme_label).clicked() {
+                    self.theme = self.theme.toggle();
+                    self.theme.apply(&ctx);
                 }
 
                 ui.separator();
@@ -424,7 +737,7 @@ impl App {
                             );
                         });
                         row.col(|ui| {
-                            ui.label(export::via_label(device));
+                            ui.label(sadp_core::export::via_label(device));
                         });
                         row.col(|ui| {
                             ui.label(match device.activated {
@@ -459,6 +772,8 @@ impl App {
                 }
             }
         });
+
+        self.settings_window(&ctx);
 
         ctx.request_repaint_after(Duration::from_millis(if self.is_scanning() {
             100
@@ -552,7 +867,10 @@ fn detail(ui: &mut egui::Ui, device: &Device) {
                         .clone()
                         .unwrap_or_else(|| tr("common.none")),
                 );
-                row(tr("tui.detail.via"), export::via_label(device).to_string());
+                row(
+                    tr("tui.detail.via"),
+                    sadp_core::export::via_label(device).to_string(),
+                );
                 row(
                     tr("tui.detail.interfaces"),
                     if device.seen_on.is_empty() {
@@ -629,7 +947,7 @@ mod tests {
             repeat: Some(Duration::from_millis(120)),
             ..ScanConfig::default()
         };
-        let mut app = App::new(&ctx, cfg, transport);
+        let mut app = App::new(&ctx, cfg, transport, None);
 
         // 0.37 起 FullOutput 里的纹理增量必须被消费，否则 Drop 会 panic（无渲染器时清空即可）。
         let mut out = ctx.run_ui(raw_input(), |ui| app.draw(ui));
@@ -650,11 +968,163 @@ mod tests {
         out.textures_delta.clear();
     }
 
+    fn test_iface(name: &str, index: u32, ip: &str, loopback: bool) -> InterfaceInfo {
+        InterfaceInfo {
+            name: name.to_string(),
+            index,
+            ipv4: Some(ip.parse().unwrap()),
+            netmask: Some("255.255.255.0".parse().unwrap()),
+            broadcast: None,
+            ipv6: Vec::new(),
+            loopback,
+        }
+    }
+
+    #[test]
+    fn selector_for_prefers_auto_when_every_non_loopback_is_selected() {
+        let ifaces = vec![
+            test_iface("eth0", 5, "192.168.1.10", false),
+            test_iface("wlan0", 6, "10.0.0.2", false),
+            test_iface("lo", 1, "127.0.0.1", true),
+        ];
+        let all: BTreeSet<String> = ifaces
+            .iter()
+            .filter(|iface| !iface.loopback)
+            .map(|iface| iface.name.clone())
+            .collect();
+        assert_eq!(selector_for(&all, &ifaces), InterfaceSelector::Auto);
+
+        let only_eth: BTreeSet<String> = ["eth0".to_string()].into_iter().collect();
+        assert_eq!(
+            selector_for(&only_eth, &ifaces),
+            InterfaceSelector::Only(vec!["eth0".to_string()])
+        );
+    }
+
+    #[test]
+    fn apply_settings_updates_cfg_and_restarts_scanning() {
+        let ctx = egui::Context::default();
+        let transport: Arc<dyn Transport> = Arc::new(sadp_net::MockTransport::single());
+        let mut app = App::new(&ctx, ScanConfig::default(), transport, None);
+        if app.iface_sel.is_empty() {
+            // CI 的极简环境可能没有可用网卡；注入一块假网卡，保证用例本身可执行。
+            app.ifaces = vec![test_iface("eth0", 5, "192.168.1.10", false)];
+            app.iface_sel = ["eth0".to_string()].into_iter().collect();
+        }
+        let selected = app.iface_sel.clone();
+
+        app.apply_settings(&selected, true, false, 500, 1000, 37_021)
+            .expect("valid settings");
+        assert_eq!(app.cfg.port, 37_021);
+        assert_eq!(app.cfg.families, vec![Family::V4]);
+        assert_eq!(app.cfg.timeout, Duration::from_millis(500));
+        assert_eq!(app.cfg.repeat, Some(Duration::from_millis(1000)));
+        assert!(app.is_scanning(), "应用设置后应自动重新扫描");
+
+        // 窗口长于周期时自动收窄到周期。
+        app.apply_settings(&selected, true, true, 5000, 1000, 37_020)
+            .expect("valid settings");
+        assert_eq!(app.cfg.timeout, Duration::from_millis(1000));
+        assert_eq!(app.cfg.families, vec![Family::V4, Family::V6]);
+
+        app.stop_scan();
+    }
+
+    #[test]
+    fn apply_settings_rejects_empty_family_or_interface() {
+        let ctx = egui::Context::default();
+        let transport: Arc<dyn Transport> = Arc::new(sadp_net::MockTransport::single());
+        let mut app = App::new(&ctx, ScanConfig::default(), transport, None);
+        if app.iface_sel.is_empty() {
+            app.ifaces = vec![test_iface("eth0", 5, "192.168.1.10", false)];
+            app.iface_sel = ["eth0".to_string()].into_iter().collect();
+        }
+        let selected = app.iface_sel.clone();
+        assert!(
+            app.apply_settings(&selected, false, false, 500, 1000, 37020)
+                .is_err()
+        );
+        assert!(
+            app.apply_settings(&BTreeSet::new(), true, true, 500, 1000, 37020)
+                .is_err()
+        );
+        // 失败不应停掉扫描
+        assert!(app.is_scanning());
+        app.stop_scan();
+    }
+
+    fn rendered_text(out: &egui::FullOutput) -> Vec<String> {
+        fn walk(shape: &egui::Shape, out: &mut Vec<String>) {
+            match shape {
+                egui::Shape::Text(text) => out.push(text.galley.text().to_string()),
+                egui::Shape::Vec(shapes) => {
+                    for shape in shapes {
+                        walk(shape, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut texts = Vec::new();
+        for clipped in &out.shapes {
+            walk(&clipped.shape, &mut texts);
+        }
+        texts
+    }
+
+    #[test]
+    fn panels_render_detail_and_status_bar() {
+        let ctx = egui::Context::default();
+        let transport: Arc<dyn Transport> = Arc::new(sadp_net::MockTransport::single());
+        let mut app = App::new(&ctx, ScanConfig::default(), transport, None);
+        std::thread::sleep(Duration::from_millis(400));
+        app.selected = app.session.devices().first().map(|d| d.key().0.clone());
+
+        let mut out = ctx.run_ui(raw_input(), |ui| app.draw(ui));
+        out.textures_delta.clear();
+        let texts = rendered_text(&out);
+        assert!(
+            texts
+                .iter()
+                .any(|t| t.contains("Scanning") || t.contains("扫描中")),
+            "底部状态栏应渲染: {texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t == "Details" || t == "详情"),
+            "右侧详情面板应渲染: {texts:?}"
+        );
+        app.stop_scan();
+    }
+
+    #[test]
+    fn settings_window_renders_headlessly() {
+        let ctx = egui::Context::default();
+        let transport: Arc<dyn Transport> = Arc::new(sadp_net::MockTransport::single());
+        let mut app = App::new(&ctx, ScanConfig::default(), transport, None);
+        app.show_settings = true;
+
+        // 窗口/Area 首帧只登记，第二帧才产生绘制形状。
+        for _ in 0..2 {
+            let mut out = ctx.run_ui(raw_input(), |ui| app.draw(ui));
+            out.textures_delta.clear();
+        }
+        let mut out = ctx.run_ui(raw_input(), |ui| app.draw(ui));
+        out.textures_delta.clear();
+        let texts = rendered_text(&out);
+        assert!(
+            texts
+                .iter()
+                .any(|t| t == "Scan settings" || t == "扫描设置"),
+            "设置窗口应渲染: {texts:?}"
+        );
+        app.stop_scan();
+    }
+
     #[test]
     fn filter_reduces_visible_rows() {
         let ctx = egui::Context::default();
         let transport: Arc<dyn Transport> = Arc::new(sadp_net::MockTransport::single());
-        let mut app = App::new(&ctx, ScanConfig::default(), transport);
+        let mut app = App::new(&ctx, ScanConfig::default(), transport, None);
         std::thread::sleep(Duration::from_millis(400));
 
         app.filter = "没有这台设备".to_string();

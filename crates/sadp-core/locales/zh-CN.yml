@@ -180,6 +180,29 @@ gui:
     export_csv: 导出 CSV
     copy: 复制
     lang: 语言
+    settings: 设置
+    theme_light: 浅色主题
+    theme_dark: 深色主题
+  export:
+    save_as: 导出为
+  settings:
+    title: 扫描设置
+    interfaces: 网卡
+    families: 地址族
+    timeout: 单轮窗口
+    repeat: 扫描周期
+    port: UDP 端口
+    hint: 应用后会停止当前扫描，并按新设置重新开始。
+    apply: 应用
+    cancel: 取消
+    select_all: 全选
+    select_none: 清空
+    applied: 设置已应用，扫描已重新开始
+    error:
+      family: 至少选择一个地址族
+      interface: 至少选择一块网卡
+      invalid: "设置无效：%{reason}"
+      rebind: "重新绑定失败：%{reason}"
   tip:
     open_web: 双击 IP 在默认浏览器中打开设备 Web 后台
   status:

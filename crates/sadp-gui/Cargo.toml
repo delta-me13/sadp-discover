@@ -17,6 +17,7 @@ sadp-net = { workspace = true }
 clap = { workspace = true }
 egui_extras = "0.37"
 fontdb = "0.24"
+rfd = "0.15"
 anyhow = { workspace = true }
 crossbeam-channel = { workspace = true }
 serde = { workspace = true }

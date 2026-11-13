@@ -29,15 +29,21 @@ pub fn install(ctx: &egui::Context) -> Option<&'static str> {
 
 fn load_system_cjk() -> Option<(&'static str, Vec<u8>, u32)> {
     // 顺序即优先级：先无衬线正文，再黑体/衬线/Unicode 兜底。
-    const CANDIDATES: [&str; 8] = [
+    // Windows 优先雅黑/等线，避免落到字形较旧的 Arial Unicode MS；
+    // macOS 仍以苹方为首选；Linux 兜底 Noto/思源。
+    const CANDIDATES: [&str; 12] = [
         "PingFang SC",
         "Hiragino Sans GB",
         "Heiti SC",
         "STHeiti",
         "Songti SC",
-        "Arial Unicode MS",
-        "Noto Sans CJK SC",
+        "Microsoft YaHei UI",
         "Microsoft YaHei",
+        "DengXian",
+        "Noto Sans CJK SC",
+        "Source Han Sans SC",
+        "Arial Unicode MS",
+        "SimSun",
     ];
 
     let mut db = fontdb::Database::new();

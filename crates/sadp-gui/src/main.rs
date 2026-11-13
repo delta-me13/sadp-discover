@@ -27,26 +27,17 @@ fn main() -> anyhow::Result<()> {
 
     let cfg = scan_config(&matches);
 
-    let transport = match UdpTransport::bind(UdpConfig {
-        port: cfg.port,
-        families: cfg.families.clone(),
-        interfaces: cfg.interfaces.clone(),
-        v6_mcast: cfg.v6_mcast,
-        broadcast: cfg.broadcast,
-        bind_v4: None,
-        bind_port: matches.get_one::<u16>("local-port").copied(),
-        allow_ephemeral_fallback: true,
-    }) {
+    let local_port = matches.get_one::<u16>("local-port").copied();
+    let transport = match bind_transport(&cfg, local_port) {
         Ok(transport) => transport,
         Err(err) => {
             eprintln!("{}", tr_args("error.net", &[("message", &err.to_string())]));
             std::process::exit(2);
         }
     };
-    for warning in transport.warnings() {
-        tracing::warn!(%warning, "传输层告警");
-    }
-    let transport: Arc<dyn Transport> = Arc::new(transport);
+    // 设置面板改端口/网卡/地址族后，需要按新配置重新绑定传输层。
+    let factory: app::TransportFactory =
+        Arc::new(move |cfg: &ScanConfig| Ok(bind_transport(cfg, local_port)?));
 
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
@@ -59,9 +50,37 @@ fn main() -> anyhow::Result<()> {
     eframe::run_native(
         "sadp-discover",
         options,
-        Box::new(move |cc| Ok(Box::new(app::App::new(&cc.egui_ctx, cfg, transport)))),
+        Box::new(move |cc| {
+            Ok(Box::new(app::App::new(
+                &cc.egui_ctx,
+                cfg,
+                transport,
+                Some(factory),
+            )))
+        }),
     )
     .map_err(|err| anyhow::anyhow!("窗口初始化失败: {err}"))
+}
+
+/// 按配置绑定 UDP 传输层；初始启动与设置变更共用。
+fn bind_transport(
+    cfg: &ScanConfig,
+    local_port: Option<u16>,
+) -> Result<Arc<dyn Transport>, sadp_core::NetError> {
+    let transport = UdpTransport::bind(UdpConfig {
+        port: cfg.port,
+        families: cfg.families.clone(),
+        interfaces: cfg.interfaces.clone(),
+        v6_mcast: cfg.v6_mcast,
+        broadcast: cfg.broadcast,
+        bind_v4: None,
+        bind_port: local_port,
+        allow_ephemeral_fallback: true,
+    })?;
+    for warning in transport.warnings() {
+        tracing::warn!(%warning, "传输层告警");
+    }
+    Ok(Arc::new(transport))
 }
 
 fn cli() -> Command {

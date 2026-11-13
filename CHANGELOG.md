@@ -13,6 +13,9 @@
   - 单击整行即可选中并查看详情；双击 IP 用系统默认浏览器打开设备 Web 后台（IPv4 优先，IPv6 自动加方括号与 scope，端口 443 自动用 HTTPS）
   - JSON / CSV 导出、剪贴板复制、中英切换，复用与 TUI 相同的扫描引擎与 locale
   - 中文字体从系统注入（fontdb，macOS 取 PingFang SC 的 TTC face index）
+- GUI 设置面板：网卡多选、IPv4/IPv6、单轮窗口、扫描周期、UDP 端口；应用后重建传输层并重新扫描
+- GUI 导出改用系统「另存为」对话框（`rfd`），JSON/CSV 与 CLI 共用 `sadp_core::export` 的字段定义
+- GUI 深/浅主题切换（默认深色）
 - `logs` 子命令 / GUI 状态栏「日志」按钮 / TUI `O` 键：一键打开日志文件夹
 - `Transport::sent_packets()`：累计成功发出的数据报数，用于区分「发不出去」与「没人回」
 - 24h 连续性压测脚本（`.gate2/soak/`）：电源门禁、caffeinate、采样与自动裁决
@@ -29,6 +32,7 @@
 
 ### Changed
 
+- GUI 的 CSV 表头改为与 `--csv` 一致的 20 列；GUI JSON 设备对象补齐 `seen_via` / `seen_on` / 首次·最近发现时间，并带 `elapsed_ms` / `port` / `families` / `rounds`
 - TUI 快捷键统一以大写展示并全部大小写不敏感；日志键 `J` → `O`、排序方向键 `T` → `D`（避免与小写 `j` 下移、`t` 换排序列冲突）
 - README 状态区简化为能力概览，里程碑细节归档到 `docs/ARCHITECTURE.md`
 

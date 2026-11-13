@@ -722,9 +722,9 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
 | G0 状态复用 | ✅ 已有基础 | 排序/过滤/可见行早在 `sadp_core::view`，TUI 与 GUI 共用；导出格式化逻辑在 GUI 侧独立实现（CLI 的 `output` 尚未抽公共层） |
 | G1 壳与扫描 | ✅ | `eframe 0.37`（当前最新）窗口 + 扫描线程（`Scanner::poll(200ms)` → crossbeam 通道 → UI drain），暂停/继续 = 停线程/起线程 |
 | G2 表格与详情 | ✅ 基础版 | `egui_extras::TableBuilder` 表格（IP/MAC/型号/来源/激活）、右侧详情、整行单击选中、双击 IP 用系统默认浏览器打开设备 Web 后台、过滤框、排序键与方向、状态栏与 toast |
-| G3 设置与导出 | 🟡 部分 | 已有 JSON/CSV 导出（写当前目录）、剪贴板复制与日志目录跳转；网卡多选与文件对话框（`rfd`）未做，网卡固定用全部可用接口，地址族 / 端口等参数走命令行 |
-| G4 体验 | 🟡 部分 | 中文字体已用 `fontdb` 从系统注入（macOS 取 PingFang SC 的 TTC face index），深色主题/字体回退顺序未细调 |
-| G5 打包 | ⬜ 未开始 | `.app` 打包与签名公证、Windows MSI |
+| G3 设置与导出 | ✅ | 设置面板：网卡多选、IPv4/IPv6、单轮窗口、扫描周期、UDP 端口；应用后重建传输层并重扫。JSON/CSV 经 `sadp_core::export`（与 CLI 同字段）导出，走 `rfd` 系统「另存为」对话框；剪贴板复制、日志目录跳转保留 |
+| G4 体验 | ✅ | 深/浅主题切换（默认深色）、中文字体从系统注入（`fontdb`）、状态栏与错误 toast、语言切换 |
+| G5 打包 | ⬜ 未开始 | `.app` 打包与签名公证、Windows MSI；本机未安装 WiX / cargo-bundle，无法本地验证，留待打包环境 |
 
 偏差记录：
 
@@ -733,7 +733,10 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
    （挂在根 `Ui` 上），`FullOutput.textures_delta` 必须显式消费（否则 Drop panic）。
    GUI 已按新 API 写好，后续跟随上游升级只需处理同类小改。
 2. **日志模块与 CLI 重复**（`sadp-gui/src/logging.rs`）：抽公共 crate 前先复制，避免为一期功能动 CLI。
-3. **导出无文件对话框**：直接写当前工作目录并提示路径，省一层依赖；代价是“另存为”体验缺失。
+3. **导出统一到 `sadp_core::export`**：设备 JSON 对象与 CSV 行只定义一次，CLI 与 GUI 共用；
+   GUI 的 CSV 表头因此从 13 列改为与 CLI 一致的 20 列，JSON 设备对象补齐
+   `seen_via` / `seen_on` / 首次·最近发现时间，并带 `elapsed_ms` / `port` / `families` / `rounds`。
+   这是对外格式的收敛，旧的 GUI 导出字段不再单独维护。
 4. **GUI 可离屏测试**：`App::draw(&mut Ui)` 与 eframe 解耦，测试用 `Context::run_ui` + `MockTransport`
    + 真实报文 fixture 跑完整 UI pass，在没有窗口的 CI 里也能验证不 panic、事件确实进入 `DeviceStore`。
 5. **Windows 单独用 glow 后端**：eframe 0.37 默认走 wgpu，而 `wgpu-hal 30.0.1` 的 D3D12 绑定与
@@ -741,7 +744,7 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
    （CI run 43245594522）。`sadp-gui` 因此按 target 拆分依赖：Windows 关默认特性、启用 glow；
    macOS/Linux 保持默认 wgpu。上游修好后删掉 Cargo.toml 里的 Windows 块即可。
 
-测试：`sadp-gui` 13 个（导出 4 + Web 后台 URL 6 + 源码 i18n key 扫描 1 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 120 个）；
+测试：`sadp-gui` 18 个（导出 4 + Web 后台 URL 6 + 源码 i18n key 扫描 1 + 离屏渲染/面板/设置/过滤 8），全量 `cargo test --workspace` 通过（共 129 个，含 1 个忽略的组播 e2e）；
 `cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt --check`、`cargo deny check` 通过。
 覆盖率：`sadp-core` 行覆盖 **83.8%**、区域覆盖 82.8%（`cargo llvm-cov -p sadp-core`），满足 Gate 1 的 ≥80% 门槛。
 
@@ -752,4 +755,5 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
 3. Gate 1 剩余项：接入 IPC/NVR、Win10 主机、开启 IPv6 的真机补矩阵与双栈；
    管理员权限下验证防火墙首启；接电源跑 `.gate1/soak/start-24h.ps1`；
    macOS 14/15 真机跑 Gate 2 清单（`docs/MACOS.md` §5）。
-4. GUI G3：网卡/地址族多选、`rfd` 另存为、`sadp-core` 导出格式化抽公共层供 CLI/GUI 共用。
+4. GUI G5：Windows MSI 与 macOS `.app` 打包、签名公证；需要 WiX 与 cargo-bundle，
+   并补一条只在 tag 上触发的打包 CI。
