@@ -733,7 +733,7 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
    （CI run 43245594522）。`sadp-gui` 因此按 target 拆分依赖：Windows 关默认特性、启用 glow；
    macOS/Linux 保持默认 wgpu。上游修好后删掉 Cargo.toml 里的 Windows 块即可。
 
-测试：`sadp-gui` 13 个（导出 4 + Web 后台 URL 6 + 源码 i18n key 扫描 1 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 119 个）；
+测试：`sadp-gui` 13 个（导出 4 + Web 后台 URL 6 + 源码 i18n key 扫描 1 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 120 个）；
 `cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt --check`、`cargo deny check` 通过。
 覆盖率：`sadp-core` 行覆盖 **83.8%**、区域覆盖 82.8%（`cargo llvm-cov -p sadp-core`），满足 Gate 1 的 ≥80% 门槛。
 

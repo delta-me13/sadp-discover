@@ -13,7 +13,7 @@
   - 单击整行即可选中并查看详情；双击 IP 用系统默认浏览器打开设备 Web 后台（IPv4 优先，IPv6 自动加方括号与 scope，端口 443 自动用 HTTPS）
   - JSON / CSV 导出、剪贴板复制、中英切换，复用与 TUI 相同的扫描引擎与 locale
   - 中文字体从系统注入（fontdb，macOS 取 PingFang SC 的 TTC face index）
-- `logs` 子命令 / GUI 状态栏「日志」按钮 / TUI `J` 键：一键打开日志文件夹
+- `logs` 子命令 / GUI 状态栏「日志」按钮 / TUI `O` 键：一键打开日志文件夹
 - `Transport::sent_packets()`：累计成功发出的数据报数，用于区分「发不出去」与「没人回」
 - 24h 连续性压测脚本（`.gate2/soak/`）：电源门禁、caffeinate、采样与自动裁决
 - `LICENSE-MIT` / `LICENSE-APACHE`、`CHANGELOG.md`、`deny.toml`（依赖许可 / 漏洞 / 来源审计）
@@ -28,6 +28,7 @@
 
 ### Changed
 
+- TUI 快捷键统一以大写展示并全部大小写不敏感；日志键 `J` → `O`、排序方向键 `T` → `D`（避免与小写 `j` 下移、`t` 换排序列冲突）
 - README 状态区简化为能力概览，里程碑细节归档到 `docs/ARCHITECTURE.md`
 
 ## [0.1.0] - 2026-11-12

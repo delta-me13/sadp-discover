@@ -2,7 +2,7 @@
 //!
 //! 设计约束（架构文档 §6.5）：
 //! - 100 ms 轮询同时充当渲染节拍，包风暴不会导致逐包重绘；
-//! - 所有文案走 i18n，`L` 键即时切换；
+//! - 所有文案走 i18n，`L` 键即时切换；字母快捷键大小写不敏感；
 //! - 只读同一份 `ScanEvent` 流，三阶段 GUI 复用同一套引擎与视图逻辑。
 //!
 //! 渲染被抽成纯函数 `render`，测试可用 `TestBackend` 在没有线程的情况下快照。
@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossterm::cursor;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::backend::CrosstermBackend;
@@ -38,6 +38,58 @@ const STATUS_TTL: Duration = Duration::from_secs(4);
 enum Mode {
     Normal,
     Filter,
+}
+
+/// 正常模式下的按键动作。按键到动作的映射集中在 [`action_for`]，
+/// 便于测试「大小写不敏感」而不触发导出、剪贴板或打开文件管理器等副作用。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum KeyAction {
+    Scan,
+    Rescan,
+    Pause,
+    Filter,
+    Language,
+    Export,
+    Copy,
+    SortNext,
+    SortDir,
+    Logs,
+    Quit,
+    Up,
+    Down,
+    PageUp,
+    PageDown,
+    Home,
+    End,
+}
+
+/// 把按键映射成动作；字母键不区分大小写。
+///
+/// 只把 `Ctrl+C` 当作退出，其余带 `Ctrl` 的组合不占用，避免和终端快捷键冲突。
+fn action_for(key: &KeyEvent) -> Option<KeyAction> {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        return matches!(key.code, KeyCode::Char('c' | 'C')).then_some(KeyAction::Quit);
+    }
+    match key.code {
+        KeyCode::Char('q' | 'Q') | KeyCode::Esc => Some(KeyAction::Quit),
+        KeyCode::Char('s' | 'S') => Some(KeyAction::Scan),
+        KeyCode::Char('r' | 'R') => Some(KeyAction::Rescan),
+        KeyCode::Char(' ') => Some(KeyAction::Pause),
+        KeyCode::Char('/') => Some(KeyAction::Filter),
+        KeyCode::Char('l' | 'L') => Some(KeyAction::Language),
+        KeyCode::Char('e' | 'E') => Some(KeyAction::Export),
+        KeyCode::Char('c' | 'C') => Some(KeyAction::Copy),
+        KeyCode::Char('t' | 'T') => Some(KeyAction::SortNext),
+        KeyCode::Char('d' | 'D') => Some(KeyAction::SortDir),
+        KeyCode::Char('o' | 'O') => Some(KeyAction::Logs),
+        KeyCode::Up | KeyCode::Char('k' | 'K') => Some(KeyAction::Up),
+        KeyCode::Down | KeyCode::Char('j' | 'J') => Some(KeyAction::Down),
+        KeyCode::PageUp => Some(KeyAction::PageUp),
+        KeyCode::PageDown => Some(KeyAction::PageDown),
+        KeyCode::Home => Some(KeyAction::Home),
+        KeyCode::End => Some(KeyAction::End),
+        _ => None,
+    }
 }
 
 pub struct App {
@@ -190,49 +242,37 @@ impl App {
             return;
         }
 
-        match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.should_quit = true;
-            }
-            KeyCode::Char('s') => self.start_scan(false),
-            KeyCode::Char('r') => self.start_scan(true),
-            KeyCode::Char(' ') => self.toggle_pause(),
-            KeyCode::Char('/') => {
+        match action_for(&key) {
+            Some(KeyAction::Quit) => self.should_quit = true,
+            Some(KeyAction::Scan) => self.start_scan(false),
+            Some(KeyAction::Rescan) => self.start_scan(true),
+            Some(KeyAction::Pause) => self.toggle_pause(),
+            Some(KeyAction::Filter) => {
                 self.mode = Mode::Filter;
                 self.filter_input = Input::new(self.view.filter.clone());
             }
-            // 不同终端对 Shift+L 的编码不一致：有的给 Char('L')，
-            // 有的给 Char('l') + SHIFT；直接不按 Shift 按 l 也很常见。
-            // 正常模式没有文本输入，接受两种大小写更稳。
-            KeyCode::Char('L') => self.toggle_language(),
-            KeyCode::Char('l') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.toggle_language();
-            }
-            KeyCode::Char('e') => self.export(),
-            KeyCode::Char('c') => self.copy_selected(),
-            // J：打开日志目录。小写 j 仍是向下移动；部分终端把 Shift+J 报成
-            // Char('j') + SHIFT，所以带 SHIFT 的小写 j 也认。
-            KeyCode::Char('J') => self.open_logs(),
-            KeyCode::Char('j') if key.modifiers.contains(KeyModifiers::SHIFT) => self.open_logs(),
-            KeyCode::Char('t') => {
+            Some(KeyAction::Language) => self.toggle_language(),
+            Some(KeyAction::Export) => self.export(),
+            Some(KeyAction::Copy) => self.copy_selected(),
+            Some(KeyAction::SortNext) => {
                 self.view.sort = self.view.sort.next();
                 self.reselect();
             }
-            KeyCode::Char('T') => {
+            Some(KeyAction::SortDir) => {
                 self.view.dir = self.view.dir.flip();
                 self.reselect();
             }
-            KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
-            KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
-            KeyCode::PageUp => self.move_selection(-10),
-            KeyCode::PageDown => self.move_selection(10),
-            KeyCode::Home => self.select_index(0),
-            KeyCode::End => {
+            Some(KeyAction::Logs) => self.open_logs(),
+            Some(KeyAction::Up) => self.move_selection(-1),
+            Some(KeyAction::Down) => self.move_selection(1),
+            Some(KeyAction::PageUp) => self.move_selection(-10),
+            Some(KeyAction::PageDown) => self.move_selection(10),
+            Some(KeyAction::Home) => self.select_index(0),
+            Some(KeyAction::End) => {
                 let last = visible_indices(self.session.devices(), &self.view).len();
                 self.select_index(last.saturating_sub(1));
             }
-            _ => {
+            None => {
                 // 不同终端对 Shift/大小写的编码不一致；记下原始按键，
                 // 用 `-vv` 跑一次就能知道某个键实际发的是什么。
                 tracing::debug!(
@@ -1036,6 +1076,50 @@ mod tests {
         app.on_event(space());
         assert!(!app.paused, "再按空格应继续");
         assert!(app.scanner.is_some());
+    }
+
+    #[test]
+    fn shortcuts_are_case_insensitive() {
+        let key = |code: KeyCode| KeyEvent::new(code, KeyModifiers::NONE);
+        for (lower, upper, action) in [
+            ('s', 'S', KeyAction::Scan),
+            ('r', 'R', KeyAction::Rescan),
+            ('e', 'E', KeyAction::Export),
+            ('c', 'C', KeyAction::Copy),
+            ('l', 'L', KeyAction::Language),
+            ('t', 'T', KeyAction::SortNext),
+            ('d', 'D', KeyAction::SortDir),
+            ('o', 'O', KeyAction::Logs),
+            ('q', 'Q', KeyAction::Quit),
+            ('j', 'J', KeyAction::Down),
+            ('k', 'K', KeyAction::Up),
+        ] {
+            assert_eq!(
+                action_for(&key(KeyCode::Char(lower))),
+                Some(action),
+                "小写 {lower} 应触发 {action:?}"
+            );
+            assert_eq!(
+                action_for(&key(KeyCode::Char(upper))),
+                Some(action),
+                "大写 {upper} 应触发 {action:?}"
+            );
+        }
+
+        // 部分终端把 Shift+字母报成小写字符 + SHIFT，仍然应按大写处理。
+        assert_eq!(
+            action_for(&KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT)),
+            Some(KeyAction::Scan)
+        );
+        // Ctrl+C 退出，Ctrl+其它字母不占用（例如 Ctrl+L 不作为切换语言）。
+        assert_eq!(
+            action_for(&KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+            Some(KeyAction::Quit)
+        );
+        assert_eq!(
+            action_for(&KeyEvent::new(KeyCode::Char('L'), KeyModifiers::CONTROL)),
+            None
+        );
     }
 
     #[test]

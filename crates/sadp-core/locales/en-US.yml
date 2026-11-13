@@ -116,7 +116,7 @@ tui:
     activated: Activated
     reset: Password reset
   help:
-    bar: "[s] scan [spc] pause [r] rescan [/] filter [e] export [L] lang [J] logs [q] quit"
+    bar: "[S] scan [spc] pause [R] rescan [/] filter [E] export [L] lang [O] logs [Q] quit"
     filter: "Filter: %{query}_"
     filter_clear: "Esc: clear filter"
   filter:

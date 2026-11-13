@@ -114,7 +114,7 @@ tui:
     activated: 已激活
     reset: 支持密码重置
   help:
-    bar: "[s] 扫描 [空格] 暂停 [r] 清空重扫 [/] 过滤 [e] 导出 [L] 语言 [J] 日志 [q] 退出"
+    bar: "[S] 扫描 [空格] 暂停 [R] 清空重扫 [/] 过滤 [E] 导出 [L] 语言 [O] 日志 [Q] 退出"
     filter: "过滤：%{query}_"
     filter_clear: "Esc：清除过滤"
   filter:
