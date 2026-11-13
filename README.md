@@ -44,8 +44,9 @@ bash scripts/build-macos-universal.sh
 # macOS 分发包（.app + .pkg，CLI 同时装到 /usr/local/bin）
 PACKAGES=sadp-gui TARGETS="aarch64-apple-darwin x86_64-apple-darwin" \
   bash scripts/macos/build.sh          # GUI 通用二进制
-bash scripts/macos/bundle.sh && bash scripts/macos/pkg.sh
-# 产物：dist/sadp-discover.app、dist/sadp-discover-<version>-macos.pkg
+bash scripts/macos/bundle.sh && bash scripts/macos/pkg.sh && bash scripts/macos/dmg.sh
+# 产物：dist/sadp-discover.app、dist/sadp-discover-<version>-macos.pkg、
+#       dist/sadp-discover-<version>-macos.dmg
 # 默认 ad-hoc 签名；正式分发需 CODESIGN_IDENTITY + notarize.sh
 
 # 图形界面（三阶段，egui）
@@ -64,7 +65,7 @@ CI 分成两条工作流，互不干扰：
 | 工作流 | 触发 | 做什么 |
 |---|---|---|
 | `dev` | push `main` / PR | `test`（fmt、clippy、Intel 交叉检查、单元测试）+ `e2e`（Windows 假设备）；不产出任何产物 |
-| `release` | **仅 `v*` tag** | 版本闸门 → cargo-deny → Windows zip / macOS universal `.app`+`.pkg`+`tar.gz` → GitHub Release |
+| `release` | **仅 `v*` tag** | 版本闸门 → cargo-deny → Windows zip / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release |
 
 ```bash
 git tag v0.1.0 && git push origin v0.1.0
@@ -72,6 +73,45 @@ git tag v0.1.0 && git push origin v0.1.0
 
 tag 必须等于 `cargo pkgid -p sadp-cli` 的版本，否则 `release` 在版本闸门就失败；
 带连字符的 tag（`v1.2.3-rc1`）自动按 prerelease 发布。
+
+## 安装与卸载
+
+macOS 有两个产物，按需求选一个：
+
+| 产物 | 装什么 | 适合 |
+|---|---|---|
+| `.pkg` | `/Applications/sadp-discover.app` + `/usr/local/bin/sadp-discover` | **推荐**：双击是 GUI，终端里直接有命令 |
+| `.dmg` | 只有 `.app`（拖进 Applications 完成安装） | 只需要 GUI、不想动系统目录 |
+
+```bash
+# .pkg：一次装好 app 与 PATH 里的 CLI
+sudo installer -pkg sadp-discover-<version>-macos.pkg -target /
+
+# .dmg：打开后把 sadp-discover.app 拖进 Applications
+open sadp-discover-<version>-macos.dmg
+```
+
+`.dmg` **不会**把 `sadp-discover` 放进 PATH。想从 dmg 装完又要在终端里用，二选一：
+
+```bash
+# 软链到 app 内的那份 CLI（与 app 同版本、同一个可执行文件）
+sudo ln -sf /Applications/sadp-discover.app/Contents/MacOS/sadp-discover /usr/local/bin/sadp-discover
+
+# 或者用 tar.gz 里独立的那份
+tar -xzf sadp-discover-<version>-macos-universal.tar.gz -C /usr/local/bin
+```
+
+卸载（`.pkg` 没有 uninstall 钩子，三条命令足够）：
+
+```bash
+sudo rm -rf /Applications/sadp-discover.app
+sudo rm -f  /usr/local/bin/sadp-discover
+rm -rf ~/Library/Application\ Support/sadp-discover   # GUI 的日志目录
+```
+
+macOS 15+ 的「本地网络」授权是记在系统设置里的，不随 app 删除而消失；
+要让新装的版本重新弹一次授权，去 **系统设置 → 隐私与安全性 → 本地网络** 里删掉
+`sadp-discover` 这一条。
 
 ## 用法
 
