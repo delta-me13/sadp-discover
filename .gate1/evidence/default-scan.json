@@ -1,0 +1,62 @@
+{
+  "schema": "sadp.discover/v1",
+  "tool": "sadp-discover",
+  "version": "0.1.0",
+  "generated_at": "2026-11-13T03:02:15.8361075Z",
+  "elapsed_ms": 3005,
+  "port": 37020,
+  "families": [
+    "v4",
+    "v6"
+  ],
+  "rounds": 1,
+  "count": 1,
+  "devices": [
+    {
+      "sn": "DS-2DE4423DW-D/GLT/XM20260203CCCHGQ4309912",
+      "mac": "04:ee:cd:7e:d0:32",
+      "ipv4": "192.168.1.120",
+      "netmask": "255.255.255.0",
+      "gateway": "192.168.1.1",
+      "ipv6": [],
+      "ipv6_masklen": 64,
+      "dhcp": false,
+      "model": "196607",
+      "description": "DS-2DE4423DW-D/GLT/XM",
+      "firmware": "V7.3 build 241203",
+      "sdk_port": 8000,
+      "http_port": 80,
+      "activated": true,
+      "reset_ability": true,
+      "analog_channels": 0,
+      "digital_channels": 1,
+      "seen_via": "v4",
+      "seen_on": [
+        "以太网"
+      ],
+      "first_seen_ago_ms": 2932,
+      "last_seen_ago_ms": 2932,
+      "extra": {
+        "boottime": "1970-01-02 06:13:14",
+        "codeencrypt": "true",
+        "detailoemcode": "1",
+        "devicelock": "true",
+        "devicetypev2": "11669066",
+        "disknumber": "0",
+        "encrypt": "true",
+        "ezvizbindstatus": "0",
+        "hcplatformenable": "flase",
+        "ismodifyverificationcode": "true",
+        "passwordresetmodesecond": "true",
+        "physicalaccessverification": "2,3,4",
+        "resetability": "false",
+        "salt": "525c3a4abc9426dc86d7039d97174f18a14b65131f87177cb8824f330e58db96",
+        "softwareversion": "V5.8.2build 241217",
+        "supportezvizunbind": "true",
+        "supporthcplatform": "true",
+        "supportmailbox": "true",
+        "supportsecurityquestion": "true"
+      }
+    }
+  ]
+}

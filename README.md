@@ -17,7 +17,8 @@
 - ✅ **CLI / TUI**：双栈发现、跨栈去重、JSON·CSV、中英双语、日志落盘
 - ✅ **macOS**：Gate 2 清单 11/12（24h 连续性待跑），通用二进制脚本
 - ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 导出 / 复制 / 语言切换 / 打开日志目录；整行单击看详情，双击 IP 开设备 Web 后台
-- ⏳ **待硬件**：真机矩阵、IPv6 组播地址抓包确认
+- 🟡 **真机（Windows）**：Win11 + 球机 DS-2DE4423DW-D/GLT/XM 已通过默认发现、多网卡/VPN 隔离、端口占用回退与双语检查；IPC/NVR、Win10 与防火墙待补，详见 [.gate1/gate1-report.md](.gate1/gate1-report.md)
+- ⏳ **待硬件**：IPC/NVR 真机、Win10 主机、IPv6 双栈真机；IPv6 组播地址抓包确认
 
 > **IPv6 说明（重要）**：SADP 的 IPv6 探测组播地址没有公开资料。当前实现按候选组
 > `ff02::1` 发送，可用 `--v6-mcast` 覆盖。若抓包证明设备不响应 IPv6 探测，

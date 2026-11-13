@@ -1,0 +1,7 @@
+IP address                 MAC                Model                    Serial number                         Via    Act
+-----------------------------------------------------------------------------------------------------------------------
+192.168.1.120              04:ee:cd:7e:d0:32  DS-2DE4423DW-D/GLT/XM    DS-2DE4423DW-D/GLT/XM20260203CCCHGQ…  v4     ✓
+
+1 device(s) found
+scan window 3.0 s
+exit=0

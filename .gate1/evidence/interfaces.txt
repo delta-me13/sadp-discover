@@ -1,0 +1,11 @@
+网络接口
+名称                     索引   IPv4               IPv6                           回环   组播加入
+Tailscale                43     100.66.1.19        fd7a:115c:a1e0::4934:114       否     v4✓ v6✓
+vgate0                   13     172.30.207.30      -                              否     v4✓
+VMware Network Adapter … 2      192.168.41.1       -                              否     v4✓
+VMware Network Adapter … 17     192.168.221.1      -                              否     v4✓
+WLAN                     21     192.168.10.111     2409:8a5c:7024:bc04::1d2, 240… 否     v4✓ v6✓
+以太网                   5      192.168.1.1        -                              否     v4✓
+Loopback Pseudo-Interfa… 1      127.0.0.1          ::1                            是     v4✓ v6✓
+
+* 组播成员关系按 socket 与地址族分别维护

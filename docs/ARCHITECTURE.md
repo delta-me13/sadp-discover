@@ -246,7 +246,7 @@ sadp-gui ──▶ sadp-core ──▶ sadp-net
 | GUI 表格 | `egui_extras`（`TableBuilder`） | 0.37 | 3 | 虚拟化行、列宽可调 |
 | 文件对话框 | `rfd` | 0.15 | 3 | 原生 Win32/Cocoa 对话框 |
 | CJK 字体（资源，非 crate） | Noto Sans SC 子集（OFL） | — | 3 | **egui 默认字体无中文字形**，必须自带；用 `pyftsubset` 裁到常用字 |
-| 快照测试 | `insta` | 1.49 | 1 | TUI 渲染快照 + JSON schema 快照 |
+| 快照测试 | 未引入（`insta` 曾列入选型） | — | — | 现用 `TestBackend` 文本断言 + JSON 字段断言，见 §13.3 |
 | 属性测试 | `proptest` | 1.12 | 1 | 解析器不 panic |
 | CLI 集成测试 | `assert_cmd` + `predicates` + `tempfile` | 2.x | 1 | 黑盒验证退出码/stdout |
 | 模糊测试 | `cargo-fuzz`（libFuzzer，nightly） | — | 1 | 解析器吃任意字节不崩 |
@@ -549,7 +549,7 @@ GUI 只读同一份 `DeviceStore`，复用同一套 `ScanEvent` 与 locale 文�
 | 健壮性 | `cargo-fuzz` 对 `decode_probe_match` 跑 24h；`proptest` 保证任意字节不 panic |
 | 引擎 | `MockTransport` 注入脚本化数据报，验证跨栈去重、合并、超时、乱序 |
 | 集成 | `xtask fake-device`：本机同时绑定 v4 `127.0.0.1:37020` 与 v6 `[::1]:37020` 回 ProbeMatch，CI 无硬件也能跑双栈端到端 |
-| TUI | `ratatui::backend::TestBackend` + `insta` 快照，中/英两种语言 × 80×24 / 120×40 |
+| TUI | `ratatui::backend::TestBackend` 文本断言，中/英两种语言 × 80×24 / 40×10；快捷键栏宽度 ≤80 列 |
 | i18n | key 对齐测试（中英 key 集合必须一致，CI 失败）；`--lang` 冒烟；硬编码文案扫描（`grep` 中文/英文句子规则） |
 | CLI | `assert_cmd` 校验 stdout JSON schema 与退出码 |
 | 跨平台 | GitHub Actions 矩阵；Windows 额外跑"37020 被占用"降级用例与"仅 IPv6"用例 |
@@ -672,16 +672,24 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
    空格会因「没有扫描器」直接返回，造成按键无反应、状态卡死；
    现在空格是纯粹的播放/暂停键：运行中则停，已停/已结束则起。
 
-### 13.3 Gate 1 尚未覆盖的部分
+### 13.3 Gate 1 真机验证（Windows）
 
-以下需要真机/真实网络环境，代码侧已就绪：
+2026-11-13 在 Windows 11 专业工作站版（10.0.26300 / Ryzen 7 5800H）上，对现场球机
+**DS-2DE4423DW-D/GLT/XM @ 192.168.1.120**（V7.3 build 241203，直连以太网）跑了清单：
+**3 项通过、4 项部分、2 项因环境缺失未测**，明细见 [.gate1/gate1-report.md](../.gate1/gate1-report.md)。
 
-- 3 种以上真机（IPC/NVR/球机）在 Win10、Win11 上的默认参数发现；
-- Hyper-V/VPN 多网卡环境不漏设备、VPN 未连接不误报；
-- 双栈真机（v4 与 v6 各回一包）只显示一行；
-- IPv6-only 主机（禁用 IPv4 协议栈）启动与扫描；
-- 防火墙首次运行提示；
-- 24 小时连续扫描的内存/句柄稳定性。
+- ✅ 多网卡/虚拟网卡隔离：以太网、WLAN、VMware×2、Tailscale、vgate0、回环逐卡扫描；
+  未连接的 aTrust VPN 与 Not Present 的幽灵适配器在枚举阶段被过滤，不误报。
+- ✅ JSON schema 冻结（`sadp.discover/v1` + 断言测试）、中英双语与 key 对齐。
+- ⚠️ 真机矩阵只有球机 × Win11；IPv6-only 主机只有 v4 bind 失败的等价验证。
+- ⚠️ 端口 37020 被占用时回退临时端口仍能发现设备；官方 SADP 未安装，属等效验证。
+- ⛔ 真机双栈（设备不上报 IPv6）、防火墙（本机 mpssvc 未运行且无管理员权限）未测；
+  24h 只做了 25 min 演练，脚本在 `.gate1/soak/`。
+- 偏差：仓库未引入 `insta`，TUI/JSON 快照实为 `TestBackend` 文本断言与字段断言，
+  明细见报告「6. JSON schema」。
+
+真机测试还暴露并修复了 `--interface` 的匹配缺陷：纯数字既被当索引又被当 IPv4 前缀，
+`-i 1` 会命中所有 `192.*` / `10.*` 网卡，回环扫描实际扫了全网卡。
 
 ### 13.4 二阶段（macOS）进展
 
@@ -741,5 +749,7 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
 
 1. 抓 2–3 台真机的 `Probe`/`ProbeMatch`（v4 与 v6 各一组），替换/补充 `tests/fixtures/`。
 2. 用 `--save-raw` 与 Wireshark 完成 M2b 的 IPv6 组地址确认，把结论回填到 §2.4。
-3. 真机跑 Gate 1 的 9 条验收项；macOS 14/15 真机跑 Gate 2 清单（`docs/MACOS.md` §5）。
+3. Gate 1 剩余项：接入 IPC/NVR、Win10 主机、开启 IPv6 的真机补矩阵与双栈；
+   管理员权限下验证防火墙首启；接电源跑 `.gate1/soak/start-24h.ps1`；
+   macOS 14/15 真机跑 Gate 2 清单（`docs/MACOS.md` §5）。
 4. GUI G3：网卡/地址族多选、`rfd` 另存为、`sadp-core` 导出格式化抽公共层供 CLI/GUI 共用。

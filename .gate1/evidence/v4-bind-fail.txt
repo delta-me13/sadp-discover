@@ -1,0 +1,7 @@
+2026-11-13T02:44:36.617502Z  WARN bind 203.0.113.1:37020 failed (在其上下文中，该请求的地址无效。 (os error 10049)); falling back to ephemeral port
+2026-11-13T02:44:36.617649Z  WARN v4 disabled: socket error: bind 203.0.113.1:0: 在其上下文中，该请求的地址无效。 (os error 10049) (os error 10049)
+! bind 203.0.113.1:37020 failed (在其上下文中，该请求的地址无效。 (os error 10049)); falling back to ephemeral port
+! v4 disabled: socket error: bind 203.0.113.1:0: 在其上下文中，该请求的地址无效。 (os error 10049) (os error 10049)
+未发现设备
+没有收到任何 SADP 响应。请确认设备与主机在同一二层网段，且防火墙放行 UDP 37020。
+exit=1

@@ -1,0 +1,14 @@
+
+Name                          InterfaceIndex Status       MediaConnectionState MacAddress       
+----                          -------------- ------       -------------------- ----------       
+aTrustVNIC                                26 Disconnected         Disconnected                  
+蓝牙网络连接 2                                  25 Disconnected         Disconnected F4-3B-D8-B0-87-B2
+WLAN                                      21 Up                      Connected F4-3B-D8-B0-87-AE
+VMware Network Adapter VMnet8             17 Up                      Connected 00-50-56-C0-00-08
+vgate0                                    13 Up                      Connected                  
+Tailscale                                 43 Up                      Connected                  
+以太网 2                                      6 Not Present               Unknown 00-FF-22-50-26-5E
+以太网                                        5 Up                      Connected 9C-2D-CD-37-34-0F
+VMware Network Adapter VMnet1              2 Up                      Connected 00-50-56-C0-00-01
+
+

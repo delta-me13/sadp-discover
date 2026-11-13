@@ -1,0 +1,123 @@
+{
+  "schema": "sadp.interfaces/v1",
+  "interfaces": [
+    {
+      "name": "Tailscale",
+      "index": 43,
+      "ipv4": "100.66.1.19",
+      "netmask": "255.255.255.255",
+      "ipv6": [
+        "fd7a:115c:a1e0::4934:114"
+      ],
+      "loopback": false
+    },
+    {
+      "name": "vgate0",
+      "index": 13,
+      "ipv4": "172.30.207.30",
+      "netmask": "255.255.255.255",
+      "loopback": false
+    },
+    {
+      "name": "VMware Network Adapter VMnet1",
+      "index": 2,
+      "ipv4": "192.168.41.1",
+      "netmask": "255.255.255.0",
+      "broadcast": "192.168.41.255",
+      "loopback": false
+    },
+    {
+      "name": "VMware Network Adapter VMnet8",
+      "index": 17,
+      "ipv4": "192.168.221.1",
+      "netmask": "255.255.255.0",
+      "broadcast": "192.168.221.255",
+      "loopback": false
+    },
+    {
+      "name": "WLAN",
+      "index": 21,
+      "ipv4": "192.168.10.111",
+      "netmask": "255.255.255.0",
+      "broadcast": "192.168.10.255",
+      "ipv6": [
+        "2409:8a5c:7024:bc04::1d2",
+        "2409:8a5c:7024:bc04:394a:4f22:7e9f:b283",
+        "2409:8a5c:7024:bc04:59f9:5e43:38db:7f18"
+      ],
+      "loopback": false
+    },
+    {
+      "name": "以太网",
+      "index": 5,
+      "ipv4": "192.168.1.1",
+      "netmask": "255.255.255.0",
+      "broadcast": "192.168.1.255",
+      "loopback": false
+    },
+    {
+      "name": "Loopback Pseudo-Interface 1",
+      "index": 1,
+      "ipv4": "127.0.0.1",
+      "netmask": "255.0.0.0",
+      "broadcast": "127.255.255.255",
+      "ipv6": [
+        "::1"
+      ],
+      "loopback": true
+    }
+  ],
+  "joins": [
+    {
+      "iface": "Tailscale",
+      "family": "v4",
+      "ok": true
+    },
+    {
+      "iface": "vgate0",
+      "family": "v4",
+      "ok": true
+    },
+    {
+      "iface": "VMware Network Adapter VMnet1",
+      "family": "v4",
+      "ok": true
+    },
+    {
+      "iface": "VMware Network Adapter VMnet8",
+      "family": "v4",
+      "ok": true
+    },
+    {
+      "iface": "WLAN",
+      "family": "v4",
+      "ok": true
+    },
+    {
+      "iface": "以太网",
+      "family": "v4",
+      "ok": true
+    },
+    {
+      "iface": "Loopback Pseudo-Interface 1",
+      "family": "v4",
+      "ok": true
+    },
+    {
+      "iface": "Tailscale",
+      "family": "v6",
+      "ok": true
+    },
+    {
+      "iface": "WLAN",
+      "family": "v6",
+      "ok": true
+    },
+    {
+      "iface": "Loopback Pseudo-Interface 1",
+      "family": "v6",
+      "ok": true
+    }
+  ],
+  "warnings": []
+}

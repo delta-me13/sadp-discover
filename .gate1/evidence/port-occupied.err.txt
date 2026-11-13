@@ -1,0 +1,3 @@
+2026-11-13T03:02:32.370160Z  WARN bind 0.0.0.0:37020 failed (以一种访问权限不允许的方式做了一个访问套接字的尝试。 (os error 10013)); falling back to ephemeral port
+端口 37020 被占用，改用临时端口 53755（可能收不到部分回包）
+! bind 0.0.0.0:37020 failed (以一种访问权限不允许的方式做了一个访问套接字的尝试。 (os error 10013)); falling back to ephemeral port

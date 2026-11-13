@@ -157,25 +157,25 @@ pub fn enumerate_interfaces(selector: &InterfaceSelector) -> Result<Vec<Interfac
 fn matches_selector(iface: &InterfaceInfo, wanted: &[String]) -> bool {
     wanted.iter().any(|w| {
         let w = w.trim();
+        if w.is_empty() {
+            return false;
+        }
         if w.eq_ignore_ascii_case(&iface.name) {
             return true;
         }
-        if let Ok(idx) = w.parse::<u32>()
-            && idx == iface.index
-        {
-            return true;
+        // 纯数字只按索引解释：此前 `--interface 1` 先命中索引 1（回环），
+        // 又会继续落到地址前缀分支，把 192.168.*、10.*、100.* 全部选中，
+        // 于是「只扫回环」实际扫了全部网卡，真机测试时暴露。
+        if let Ok(idx) = w.parse::<u32>() {
+            return idx == iface.index;
         }
-        if let Ok(ip) = w.parse::<Ipv4Addr>()
-            && iface.ipv4 == Some(ip)
-        {
-            return true;
+        if let Ok(ip) = w.parse::<Ipv4Addr>() {
+            return iface.ipv4 == Some(ip);
         }
-        if let Ok(ip) = w.parse::<Ipv6Addr>()
-            && iface.ipv6.contains(&ip)
-        {
-            return true;
+        if let Ok(ip) = w.parse::<Ipv6Addr>() {
+            return iface.ipv6.contains(&ip);
         }
-        // 允许用地址前缀匹配，便于 `--interface 192.168.1.` 这样的写法。
+        // 非完整地址才允许前缀匹配，便于 `--interface 192.168.1.` 这样的写法。
         iface.ipv4.is_some_and(|ip| ip.to_string().starts_with(w))
     })
 }
@@ -248,6 +248,9 @@ mod tests {
         assert!(matches_selector(&i, &["192.168.1.10".into()]));
         assert!(matches_selector(&i, &["192.168.1.".into()]));
         assert!(!matches_selector(&i, &["10.0.0.1".into()]));
+        // 纯数字是索引，不是地址前缀：索引 1 的网卡不应选中 192.168.1.10。
+        assert!(!matches_selector(&i, &["1".into()]));
+        assert!(matches_selector(&i, &["7".into()]));
     }
 
     #[test]

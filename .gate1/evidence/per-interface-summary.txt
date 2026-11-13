@@ -1,0 +1,11 @@
+-i '5' exit=0 "count": 1
+-i '以太网' exit=0 "count": 1
+-i '192.168.1.1' exit=0 "count": 1
+-i '1' exit=1 "count": 0
+-i '21' exit=1 "count": 0
+-i '43' exit=1 "count": 0
+-i '13' exit=1 "count": 0
+-i '2' exit=1 "count": 0
+-i '17' exit=1 "count": 0
+-i '5,21' exit=0 "count": 1
+-i '5,5' exit=0 "count": 1
