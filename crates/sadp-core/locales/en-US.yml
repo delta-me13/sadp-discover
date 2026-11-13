@@ -30,6 +30,7 @@ cli:
     scan: Scan for devices (default)
     interfaces: List network interfaces and multicast membership
     completions: Generate shell completion scripts
+    logs: Open the log folder
   arg:
     timeout: "Scan window per round, in milliseconds (default %{default})"
     repeat: "Start a new round every N ms (default: single round)"
@@ -115,7 +116,7 @@ tui:
     activated: Activated
     reset: Password reset
   help:
-    bar: "[s] scan [space] pause [r] clear+scan [/] filter [e] export [L] lang [q] quit"
+    bar: "[s] scan [spc] pause [r] rescan [/] filter [e] export [L] lang [J] logs [q] quit"
     filter: "Filter: %{query}_"
     filter_clear: "Esc: clear filter"
   filter:
@@ -141,6 +142,13 @@ out:
   no_devices: No devices found.
   elapsed: "scan window %{elapsed}"
   errors: "%{count} error(s); see the log for details"
+
+log:
+  action: Logs
+  action_tip: Open the log folder
+  opened: "Opened log folder: %{path}"
+  failed: "Cannot open log folder: %{reason}"
+  unavailable: Unable to locate the log directory
 
 interfaces:
   title: Network interfaces

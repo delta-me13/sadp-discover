@@ -8,6 +8,7 @@ rust_i18n::i18n!("locales", fallback = "en-US");
 pub mod i18n;
 pub mod proto;
 pub mod scan;
+pub mod system;
 pub mod view;
 
 pub use i18n::{Lang, tr, tr_args};

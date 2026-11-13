@@ -16,7 +16,7 @@
 
 - ✅ **CLI / TUI**：双栈发现、跨栈去重、JSON·CSV、中英双语、日志落盘
 - ✅ **macOS**：Gate 2 清单 11/12（24h 连续性待跑），通用二进制脚本
-- ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 导出 / 复制 / 语言切换；整行单击看详情，双击 IP 开设备 Web 后台
+- ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 导出 / 复制 / 语言切换 / 打开日志目录；整行单击看详情，双击 IP 开设备 Web 后台
 - ⏳ **待硬件**：真机矩阵、IPv6 组播地址抓包确认
 
 > **IPv6 说明（重要）**：SADP 的 IPv6 探测组播地址没有公开资料。当前实现按候选组
@@ -55,6 +55,7 @@ sadp-discover --family v6 --no-tui  # 仅 IPv6，纯文本
 sadp-discover --passive             # 只监听设备主动通告
 sadp-discover interfaces            # 网卡列表 + 每个地址族的组播加入结果
 sadp-discover completions powershell
+sadp-discover logs                  # 打开日志文件夹（资源管理器 / Finder）
 
 # 图形界面：同一套扫描引擎与事件契约，窗口里看表格/详情
 sadp-discover-gui                    # 启动即扫描，每秒一轮；单击行看详情，双击 IP 开 Web 后台
@@ -77,7 +78,7 @@ sadp-discover-gui --local-port 0     # 与官方 SADP 同机时避开 37020
 | `--save-raw <DIR>` | 原始报文落盘，便于排障 |
 | `--lang en-US\|zh-CN` | 界面语言 |
 
-TUI 快捷键：`s` 立即扫描（保留结果）、`空格` 暂停/继续、`r` 清空结果并重扫、`/` 过滤、`e` 导出、`c` 复制、`t/T` 换排序列/方向、`L` 切换语言（大小写均可）、`q` 退出。
+TUI 快捷键：`s` 立即扫描（保留结果）、`空格` 暂停/继续、`r` 清空结果并重扫、`/` 过滤、`e` 导出、`c` 复制、`t/T` 换排序列/方向、`L` 切换语言（大小写均可）、`J` 打开日志文件夹、`q` 退出。
 
 ### 退出码
 
@@ -126,9 +127,9 @@ sadp-gui ──▶ sadp-core ──▶ sadp-net      （三阶段）
 
 | crate | 职责 |
 |---|---|
-| `sadp-net` | 网卡枚举、双栈 UDP、组播/广播、接收线程（唯一出现 `cfg(target_os)` 的地方） |
-| `sadp-core` | 协议编解码、设备模型与去重合并、扫描引擎、视图逻辑、i18n |
-| `sadp-cli` | 参数解析、TUI、JSON/CSV 输出、日志 |
+| `sadp-net` | 网卡枚举、双栈 UDP、组播/广播、接收线程（socket 平台差异集中在这里） |
+| `sadp-core` | 协议编解码、设备模型与去重合并、扫描引擎、视图逻辑、i18n、系统工具调用（打开 URL / 目录） |
+| `sadp-cli` | 参数解析、TUI、JSON/CSV 输出、日志、剪贴板 |
 | `sadp-fake-device` | 本地假设备，无真机时做端到端验证 |
 
 一次扫描的数据流：

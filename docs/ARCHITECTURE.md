@@ -190,13 +190,13 @@ sadp-discover/
 ├─ Cargo.toml                 # [workspace] members = [...]
 ├─ rust-toolchain.toml        # 固定 stable，声明 MSRV
 ├─ crates/
-│  ├─ sadp-net/               # 平台传输层（唯一允许 cfg(target_os) 的地方）
-│  │  └─ src/{lib,iface,udp,platform/{windows,macos}}.rs
-│  ├─ sadp-core/              # 协议 + 扫描引擎 + i18n（纯逻辑，无终端/无 GUI）
+│  ├─ sadp-net/               # 平台传输层；socket 相关的 cfg(target_os) 只在这里
+│  │  └─ src/{lib,iface,udp,mock}.rs
+│  ├─ sadp-core/              # 协议 + 扫描引擎 + i18n + 系统工具调用（无终端/无 GUI）
 │  │  ├─ locales/{en-US,zh-CN}.yml
-│  │  └─ src/{lib,proto/{model,parse,encode},scan/{config,session,store,event},view,i18n}.rs
+│  │  └─ src/{lib,proto/{model,parse,encode},scan/{config,session,store,event},view,i18n,system}.rs
 │  ├─ sadp-cli/               # 一阶段产物
-│  │  └─ src/{main,args,commands,tui,output,logging}.rs
+│  │  └─ src/{main,args,commands,tui,output,logging,clipboard}.rs
 │  └─ sadp-gui/               # 三阶段产物
 ├─ xtask/                     # 构建/打包/假设备（fake-device）
 ├─ tests/fixtures/            # 抓包得到的 XML 样本（脱敏）
@@ -714,7 +714,7 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
 | G0 状态复用 | ✅ 已有基础 | 排序/过滤/可见行早在 `sadp_core::view`，TUI 与 GUI 共用；导出格式化逻辑在 GUI 侧独立实现（CLI 的 `output` 尚未抽公共层） |
 | G1 壳与扫描 | ✅ | `eframe 0.37`（当前最新）窗口 + 扫描线程（`Scanner::poll(200ms)` → crossbeam 通道 → UI drain），暂停/继续 = 停线程/起线程 |
 | G2 表格与详情 | ✅ 基础版 | `egui_extras::TableBuilder` 表格（IP/MAC/型号/来源/激活）、右侧详情、整行单击选中、双击 IP 用系统默认浏览器打开设备 Web 后台、过滤框、排序键与方向、状态栏与 toast |
-| G3 设置与导出 | 🟡 部分 | 已有 JSON/CSV 导出（写当前目录）与剪贴板复制；网卡多选与文件对话框（`rfd`）未做，网卡固定用全部可用接口，地址族 / 端口等参数走命令行 |
+| G3 设置与导出 | 🟡 部分 | 已有 JSON/CSV 导出（写当前目录）、剪贴板复制与日志目录跳转；网卡多选与文件对话框（`rfd`）未做，网卡固定用全部可用接口，地址族 / 端口等参数走命令行 |
 | G4 体验 | 🟡 部分 | 中文字体已用 `fontdb` 从系统注入（macOS 取 PingFang SC 的 TTC face index），深色主题/字体回退顺序未细调 |
 | G5 打包 | ⬜ 未开始 | `.app` 打包与签名公证、Windows MSI |
 
@@ -733,7 +733,7 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
    （CI run 43245594522）。`sadp-gui` 因此按 target 拆分依赖：Windows 关默认特性、启用 glow；
    macOS/Linux 保持默认 wgpu。上游修好后删掉 Cargo.toml 里的 Windows 块即可。
 
-测试：`sadp-gui` 13 个（导出 4 + Web 后台 URL 6 + 源码 i18n key 扫描 1 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 118 个）；
+测试：`sadp-gui` 13 个（导出 4 + Web 后台 URL 6 + 源码 i18n key 扫描 1 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 119 个）；
 `cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt --check`、`cargo deny check` 通过。
 覆盖率：`sadp-core` 行覆盖 **83.8%**、区域覆盖 82.8%（`cargo llvm-cov -p sadp-core`），满足 Gate 1 的 ≥80% 门槛。
 

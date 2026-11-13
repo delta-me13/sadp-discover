@@ -27,6 +27,7 @@ pub enum Kind {
     Scan(ScanArgs),
     Interfaces(InterfacesArgs),
     Completions(CompletionsArgs),
+    Logs,
 }
 
 #[derive(Clone, Debug)]
@@ -163,6 +164,7 @@ pub fn command() -> ClapCommand {
                         .help(tr("cli.arg.json")),
                 ),
         )
+        .subcommand(ClapCommand::new("logs").about(tr("cli.cmd.logs")))
         .subcommand(
             ClapCommand::new("completions")
                 .about(tr("cli.cmd.completions"))
@@ -297,6 +299,7 @@ pub fn parse() -> Result<Cli, clap::Error> {
         Some(("interfaces", sub)) => Kind::Interfaces(InterfacesArgs {
             json: sub.get_flag("json"),
         }),
+        Some(("logs", _)) => Kind::Logs,
         Some(("completions", sub)) => {
             let shell = sub
                 .get_one::<String>("shell")

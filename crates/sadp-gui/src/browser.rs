@@ -1,9 +1,6 @@
-//! 用系统默认浏览器打开设备的 Web 后台。
+//! 设备 Web 后台 URL 构造。
 //!
-//! 不引入额外依赖，沿用 CLI 剪贴板的做法：调用系统自带工具，保持单文件分发。
-
-use std::io;
-use std::process::Command;
+//! 打开动作交给 [`sadp_core::system::open_url`]，这里只负责把设备地址拼成正确的 URL。
 
 use sadp_core::Device;
 
@@ -39,38 +36,6 @@ pub fn web_url(device: &Device) -> Option<String> {
     } else {
         format!("{scheme}://{host}:{port}/")
     })
-}
-
-/// 交给系统默认浏览器打开。只负责拉起进程，不等待浏览器退出。
-pub fn open(url: &str) -> io::Result<()> {
-    let mut child = opener(url).spawn()?;
-    // 不阻塞 UI；子进程退出后由这个线程回收，避免 Unix 上留下僵尸进程。
-    std::thread::spawn(move || {
-        let _ = child.wait();
-    });
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn opener(url: &str) -> Command {
-    // 直接调 FileProtocolHandler，不经过 cmd，避免 URL 里的字符被 shell 解释。
-    let mut cmd = Command::new("rundll32");
-    cmd.arg("url.dll,FileProtocolHandler").arg(url);
-    cmd
-}
-
-#[cfg(target_os = "macos")]
-fn opener(url: &str) -> Command {
-    let mut cmd = Command::new("open");
-    cmd.arg(url);
-    cmd
-}
-
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn opener(url: &str) -> Command {
-    let mut cmd = Command::new("xdg-open");
-    cmd.arg(url);
-    cmd
 }
 
 #[cfg(test)]

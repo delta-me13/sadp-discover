@@ -211,6 +211,10 @@ impl App {
             }
             KeyCode::Char('e') => self.export(),
             KeyCode::Char('c') => self.copy_selected(),
+            // J：打开日志目录。小写 j 仍是向下移动；部分终端把 Shift+J 报成
+            // Char('j') + SHIFT，所以带 SHIFT 的小写 j 也认。
+            KeyCode::Char('J') => self.open_logs(),
+            KeyCode::Char('j') if key.modifiers.contains(KeyModifiers::SHIFT) => self.open_logs(),
             KeyCode::Char('t') => {
                 self.view.sort = self.view.sort.next();
                 self.reselect();
@@ -344,6 +348,23 @@ impl App {
                 let msg = tr_args("tui.export.failed", &[("reason", &e.to_string())]);
                 self.set_status(msg);
             }
+        }
+    }
+
+    /// 打开日志目录，方便排障时一键跳转。
+    fn open_logs(&mut self) {
+        let Some(dir) = crate::logging::log_dir() else {
+            self.set_status(tr("log.unavailable"));
+            return;
+        };
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            self.set_status(tr_args("log.failed", &[("reason", &e.to_string())]));
+            return;
+        }
+        let path = dir.display().to_string();
+        match sadp_core::system::open_dir(&dir) {
+            Ok(()) => self.set_status(tr_args("log.opened", &[("path", &path)])),
+            Err(e) => self.set_status(tr_args("log.failed", &[("reason", &e.to_string())])),
         }
     }
 

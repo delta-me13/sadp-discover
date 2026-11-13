@@ -49,6 +49,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Kind::Interfaces(ifaces) => ExitCode::from(commands::interfaces(&ifaces)),
+        Kind::Logs => ExitCode::from(commands::logs()),
         Kind::Scan(scan) => ExitCode::from(run_scan(scan, tui_mode)),
     }
 }

@@ -192,6 +192,27 @@ impl App {
     fn toggle_lang(&mut self) {
         self.lang = sadp_core::i18n::toggle();
     }
+
+    /// 打开日志目录，方便排障时一键跳转。
+    fn open_logs(&mut self) {
+        let Some(dir) = crate::logging::log_dir() else {
+            self.set_toast(tr("log.unavailable"));
+            return;
+        };
+        if let Err(err) = std::fs::create_dir_all(&dir) {
+            let reason = err.to_string();
+            self.set_toast(tr_args("log.failed", &[("reason", &reason)]));
+            return;
+        }
+        let path = dir.display().to_string();
+        match sadp_core::system::open_dir(&dir) {
+            Ok(()) => self.set_toast(tr_args("log.opened", &[("path", &path)])),
+            Err(err) => {
+                let reason = err.to_string();
+                self.set_toast(tr_args("log.failed", &[("reason", &reason)]));
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
@@ -265,6 +286,7 @@ impl App {
             ui.add_space(4.0);
         });
 
+        let mut log_clicked = false;
         egui::Panel::bottom("status").show(ui, |ui| {
             let total = self.session.devices().len();
             ui.horizontal(|ui| {
@@ -299,8 +321,20 @@ impl App {
                     ui.separator();
                     ui.label(message);
                 }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(tr("log.action"))
+                        .on_hover_text(tr("log.action_tip"))
+                        .clicked()
+                    {
+                        log_clicked = true;
+                    }
+                });
             });
         });
+        if log_clicked {
+            self.open_logs();
+        }
 
         let devices: Vec<Device> = self.session.devices().to_vec();
         let visible = visible_indices(&devices, &self.view);
@@ -331,6 +365,10 @@ impl App {
                 });
                 return;
             }
+            // 表格文字不参与文本选择：否则点击 IP/型号等文字会被 Label 拦下，
+            // 整行点击与双击 IP 都只有单元格空白处才生效。
+            ui.style_mut().interaction.selectable_labels = false;
+
             let mut clicked: Option<String> = None;
             let mut open_web: Option<String> = None;
             let row_height = 22.0;
@@ -412,7 +450,7 @@ impl App {
                 self.selected = Some(key);
             }
             if let Some(url) = open_web {
-                match browser::open(&url) {
+                match sadp_core::system::open_url(&url) {
                     Ok(()) => self.set_toast(tr_args("gui.status.opened", &[("url", &url)])),
                     Err(err) => {
                         let reason = err.to_string();

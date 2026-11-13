@@ -28,6 +28,7 @@ cli:
     scan: 扫描设备（默认命令）
     interfaces: 列出网卡与组播加入情况
     completions: 生成 shell 补全脚本
+    logs: 打开日志文件夹
   arg:
     timeout: "单轮扫描时长，毫秒（默认 %{default}）"
     repeat: "每 N 毫秒开始新一轮（默认只扫一轮）"
@@ -113,7 +114,7 @@ tui:
     activated: 已激活
     reset: 支持密码重置
   help:
-    bar: "[s] 扫描 [空格] 暂停 [r] 清空重扫 [/] 过滤 [e] 导出 [L] 语言 [q] 退出"
+    bar: "[s] 扫描 [空格] 暂停 [r] 清空重扫 [/] 过滤 [e] 导出 [L] 语言 [J] 日志 [q] 退出"
     filter: "过滤：%{query}_"
     filter_clear: "Esc：清除过滤"
   filter:
@@ -139,6 +140,13 @@ out:
   no_devices: 未发现设备
   elapsed: "扫描窗口 %{elapsed}"
   errors: "%{count} 个错误，详见日志"
+
+log:
+  action: 日志
+  action_tip: 打开日志文件夹
+  opened: "已打开日志文件夹：%{path}"
+  failed: "无法打开日志文件夹：%{reason}"
+  unavailable: 无法确定日志目录位置
 
 interfaces:
   title: 网络接口

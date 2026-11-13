@@ -1,4 +1,4 @@
-//! 非扫描类子命令：`interfaces` 与 `completions`。
+//! 非扫描类子命令：`interfaces`、`completions` 与 `logs`。
 
 use std::io::Write;
 
@@ -8,6 +8,7 @@ use sadp_net::{Family, InterfaceInfo, InterfaceSelector, enumerate_interfaces};
 use serde::Serialize;
 
 use crate::args::{CompletionsArgs, InterfacesArgs};
+use crate::logging;
 use crate::output::pad_display;
 
 #[derive(Debug, Serialize)]
@@ -16,6 +17,26 @@ struct InterfacesJson<'a> {
     interfaces: &'a [InterfaceInfo],
     joins: &'a [JoinStatus],
     warnings: &'a [String],
+}
+
+/// 打开日志目录；同时打印路径，便于没有桌面环境时直接复制。
+pub fn logs() -> u8 {
+    let Some(dir) = logging::log_dir() else {
+        eprintln!("{}", tr("log.unavailable"));
+        return 2;
+    };
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        eprintln!("{}", tr_args("log.failed", &[("reason", &e.to_string())]));
+        return 2;
+    }
+    println!("{}", dir.display());
+    match sadp_core::system::open_dir(&dir) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("{}", tr_args("log.failed", &[("reason", &e.to_string())]));
+            2
+        }
+    }
 }
 
 /// 列出网卡；顺带做一次「绑定 + 组播加入」演练，把失败原因打出来。

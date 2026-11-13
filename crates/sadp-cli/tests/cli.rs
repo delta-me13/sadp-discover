@@ -55,6 +55,15 @@ fn subcommand_help_is_localized_too() {
 }
 
 #[test]
+fn logs_help_is_localized_and_does_not_open_explorer() {
+    bin()
+        .args(["--lang", "zh-CN", "logs", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("打开日志文件夹"));
+}
+
+#[test]
 fn invalid_timeout_exits_with_code_two() {
     bin()
         .args(["--timeout", "abc", "--no-tui"])
