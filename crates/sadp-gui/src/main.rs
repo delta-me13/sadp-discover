@@ -4,6 +4,7 @@
 //! 事件契约与 TUI 完全相同（ScanEvent），因此两条前端可以并跑对照。
 
 mod app;
+mod browser;
 mod export;
 mod fonts;
 mod logging;

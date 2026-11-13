@@ -2,12 +2,15 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
 
+> 发布状态：`v0.1.0` 的 Git tag 与 GitHub Release 尚未创建，下方对比/发布链接在补 tag 前不可用。
+
 ## [Unreleased]
 
 ### Added
 
 - 三阶段图形界面：新增 `sadp-gui` crate（二进制 `sadp-discover-gui`），基于最新的 eframe / egui 0.37
   - 表格（IP / MAC / 型号 / 来源 / 激活）、详情面板、行选中、过滤、排序键与方向
+  - 单击整行即可选中并查看详情；双击 IP 用系统默认浏览器打开设备 Web 后台（IPv4 优先，IPv6 自动加方括号与 scope，端口 443 自动用 HTTPS）
   - JSON / CSV 导出、剪贴板复制、中英切换，复用与 TUI 相同的扫描引擎与 locale
   - 中文字体从系统注入（fontdb，macOS 取 PingFang SC 的 TTC face index）
 - `Transport::sent_packets()`：累计成功发出的数据报数，用于区分「发不出去」与「没人回」
@@ -17,6 +20,7 @@
 
 ### Fixed
 
+- GUI 表格「激活」列与详情「DHCP」行把不存在的 `tui.yes` / `tui.no` / `tui.none` 当成 key，界面上直接显示 key 原文；改用 `common.*`，并新增源码 key 扫描测试防止同类漏配
 - macOS 上「0 设备」不再固定误报本地网络权限：只有探测包发不出去时才提示权限（Gate 2 观察项 F2）
 - Windows 上 GUI 无法构建：`wgpu-hal 30` 的 D3D12 绑定与 `windows 0.62.2` 不兼容，Windows 改用 glow 后端
 

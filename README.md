@@ -16,7 +16,7 @@
 
 - ✅ **CLI / TUI**：双栈发现、跨栈去重、JSON·CSV、中英双语、日志落盘
 - ✅ **macOS**：Gate 2 清单 11/12（24h 连续性待跑），通用二进制脚本
-- ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 导出 / 复制 / 语言切换
+- ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 导出 / 复制 / 语言切换；整行单击看详情，双击 IP 开设备 Web 后台
 - ⏳ **待硬件**：真机矩阵、IPv6 组播地址抓包确认
 
 > **IPv6 说明（重要）**：SADP 的 IPv6 探测组播地址没有公开资料。当前实现按候选组
@@ -57,7 +57,7 @@ sadp-discover interfaces            # 网卡列表 + 每个地址族的组播加
 sadp-discover completions powershell
 
 # 图形界面：同一套扫描引擎与事件契约，窗口里看表格/详情
-sadp-discover-gui                    # 启动即扫描，每秒一轮
+sadp-discover-gui                    # 启动即扫描，每秒一轮；单击行看详情，双击 IP 开 Web 后台
 sadp-discover-gui --lang en-US       # 指定界面语言
 sadp-discover-gui --local-port 0     # 与官方 SADP 同机时避开 37020
 ```

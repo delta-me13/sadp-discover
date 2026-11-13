@@ -14,7 +14,7 @@ use sadp_core::scan::{ScanConfig, ScanEvent, Scanner, Session};
 use sadp_core::view::{SortKey, ViewOptions, visible_indices};
 use sadp_core::{Device, Lang, Transport, tr, tr_args};
 
-use crate::export;
+use crate::{browser, export};
 
 /// 扫描线程发回主线程的消息。
 enum Msg {
@@ -332,10 +332,12 @@ impl App {
                 return;
             }
             let mut clicked: Option<String> = None;
+            let mut open_web: Option<String> = None;
             let row_height = 22.0;
             TableBuilder::new(ui)
                 .striped(true)
                 .resizable(true)
+                .sense(egui::Sense::click())
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(Column::initial(180.0).at_least(120.0))
                 .column(Column::initial(150.0).at_least(120.0))
@@ -362,18 +364,17 @@ impl App {
                             return;
                         };
                         let key = device.key().0.clone();
-                        let selected = self.selected.as_ref() == Some(&key);
-                        row.col(|ui| {
-                            if ui.selectable_label(selected, device.primary_ip()).clicked() {
-                                clicked = Some(key.clone());
-                            }
+                        row.set_selected(self.selected.as_ref() == Some(&key));
+                        let (_, ip_response) = row.col(|ui| {
+                            ui.label(device.primary_ip())
+                                .on_hover_text(tr("gui.tip.open_web"));
                         });
                         row.col(|ui| {
                             ui.label(
                                 device
                                     .mac
                                     .map(|m| m.to_string())
-                                    .unwrap_or_else(|| tr("tui.none")),
+                                    .unwrap_or_else(|| tr("common.none")),
                             );
                         });
                         row.col(|ui| {
@@ -381,7 +382,7 @@ impl App {
                                 device
                                     .display_model()
                                     .map(str::to_string)
-                                    .unwrap_or_else(|| tr("tui.none")),
+                                    .unwrap_or_else(|| tr("common.none")),
                             );
                         });
                         row.col(|ui| {
@@ -389,15 +390,35 @@ impl App {
                         });
                         row.col(|ui| {
                             ui.label(match device.activated {
-                                Some(true) => tr("tui.yes"),
-                                Some(false) => tr("tui.no"),
-                                None => tr("tui.unknown"),
+                                Some(true) => tr("common.yes"),
+                                Some(false) => tr("common.no"),
+                                None => tr("common.unknown"),
                             });
                         });
+
+                        // 双击 IP：用系统默认浏览器打开设备 Web 后台。
+                        if ip_response.double_clicked()
+                            && let Some(url) = browser::web_url(device)
+                        {
+                            open_web = Some(url);
+                        }
+                        // 整行任意位置单击都选中（详情面板随之更新）。
+                        if row.response().clicked() {
+                            clicked = Some(key);
+                        }
                     });
                 });
             if let Some(key) = clicked {
                 self.selected = Some(key);
+            }
+            if let Some(url) = open_web {
+                match browser::open(&url) {
+                    Ok(()) => self.set_toast(tr_args("gui.status.opened", &[("url", &url)])),
+                    Err(err) => {
+                        let reason = err.to_string();
+                        self.set_toast(tr_args("gui.error.open_web", &[("reason", &reason)]));
+                    }
+                }
             }
         });
 
@@ -423,14 +444,14 @@ fn detail(ui: &mut egui::Ui, device: &Device) {
                 };
                 row(
                     tr("tui.detail.sn"),
-                    device.sn.clone().unwrap_or_else(|| tr("tui.none")),
+                    device.sn.clone().unwrap_or_else(|| tr("common.none")),
                 );
                 row(
                     tr("tui.detail.mac"),
                     device
                         .mac
                         .map(|m| m.to_string())
-                        .unwrap_or_else(|| tr("tui.none")),
+                        .unwrap_or_else(|| tr("common.none")),
                 );
                 row(tr("tui.col.ip"), device.primary_ip());
                 if !device.ipv6.is_empty() {
@@ -447,18 +468,18 @@ fn detail(ui: &mut egui::Ui, device: &Device) {
                     device
                         .gateway
                         .map(|ip| ip.to_string())
-                        .unwrap_or_else(|| tr("tui.none")),
+                        .unwrap_or_else(|| tr("common.none")),
                 );
                 row(
                     tr("tui.detail.dhcp"),
                     match device.dhcp {
-                        Some(true) => tr("tui.yes"),
-                        Some(false) => tr("tui.no"),
-                        None => tr("tui.unknown"),
+                        Some(true) => tr("common.yes"),
+                        Some(false) => tr("common.no"),
+                        None => tr("common.unknown"),
                     },
                 );
                 let ports = match (device.sdk_port, device.http_port) {
-                    (None, None) => tr("tui.none"),
+                    (None, None) => tr("common.none"),
                     (sdk, http) => format!(
                         "{} / {}",
                         sdk.map(|p| p.to_string()).unwrap_or_else(|| "-".into()),
@@ -467,7 +488,7 @@ fn detail(ui: &mut egui::Ui, device: &Device) {
                 };
                 row(tr("tui.detail.ports"), ports);
                 let channels = match (device.analog_channels, device.digital_channels) {
-                    (None, None) => tr("tui.none"),
+                    (None, None) => tr("common.none"),
                     (a, d) => format!(
                         "{} / {}",
                         a.map(|p| p.to_string()).unwrap_or_else(|| "-".into()),
@@ -477,24 +498,27 @@ fn detail(ui: &mut egui::Ui, device: &Device) {
                 row(tr("tui.detail.channels"), channels);
                 row(
                     tr("tui.detail.firmware"),
-                    device.firmware.clone().unwrap_or_else(|| tr("tui.none")),
+                    device.firmware.clone().unwrap_or_else(|| tr("common.none")),
                 );
                 row(
                     tr("tui.detail.model"),
                     device
                         .display_model()
                         .map(str::to_string)
-                        .unwrap_or_else(|| tr("tui.none")),
+                        .unwrap_or_else(|| tr("common.none")),
                 );
                 row(
                     tr("tui.detail.description"),
-                    device.description.clone().unwrap_or_else(|| tr("tui.none")),
+                    device
+                        .description
+                        .clone()
+                        .unwrap_or_else(|| tr("common.none")),
                 );
                 row(tr("tui.detail.via"), export::via_label(device).to_string());
                 row(
                     tr("tui.detail.interfaces"),
                     if device.seen_on.is_empty() {
-                        tr("tui.none")
+                        tr("common.none")
                     } else {
                         device.seen_on.join(", ")
                     },
@@ -599,5 +623,78 @@ mod tests {
         app.view.filter = app.filter.clone();
         let visible = visible_indices(app.session.devices(), &app.view);
         assert!(visible.is_empty(), "过滤词不匹配时不应有可见行");
+    }
+
+    /// GUI 源码里用到的 key 必须在两种语言下都存在。
+    ///
+    /// 之前表格把「是/否」写成了不存在的 `tui.yes` / `tui.no`，界面上直接露出 key 本身；
+    /// 这个测试扫描 `tr("…")` / `tr_args("…")` 的字面量，防止同类漏配再次进入。
+    #[test]
+    fn translation_keys_used_in_sources_exist() {
+        static LOCALE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = LOCALE_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut keys = std::collections::BTreeSet::new();
+        for entry in std::fs::read_dir(&src).expect("read src dir") {
+            let path = entry.expect("dir entry").path();
+            if path.extension().is_none_or(|ext| ext != "rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).expect("read source file");
+            // 跳过测试模块，避免把测试自身构造的字符串当成 key。
+            let production = text.split("#[cfg(test)]").next().unwrap_or(&text);
+            keys.extend(tr_keys(production));
+        }
+        assert!(keys.len() > 20, "解析到的 key 数量异常: {}", keys.len());
+
+        for lang in sadp_core::Lang::ALL {
+            sadp_core::i18n::set(lang);
+            for key in &keys {
+                assert!(
+                    sadp_core::i18n::has_key(key),
+                    "{} 缺少 GUI 使用的翻译 key `{key}`",
+                    lang.code()
+                );
+            }
+        }
+        sadp_core::i18n::set(sadp_core::Lang::EnUs);
+    }
+
+    /// 提取 `tr("…")` / `tr_args("…")` 的字面量 key；动态 key（变量、方法调用）忽略。
+    fn tr_keys(text: &str) -> Vec<String> {
+        let needles = ["tr_args(", concat!("tr", "(")];
+        let mut keys = Vec::new();
+        for needle in needles {
+            for (idx, _) in text.match_indices(needle) {
+                if text[..idx]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|c| c.is_alphanumeric() || c == '_')
+                {
+                    continue;
+                }
+                let rest = text[idx + needle.len()..].trim_start();
+                let Some(rest) = rest.strip_prefix('"') else {
+                    continue;
+                };
+                let Some(end) = rest.find('"') else {
+                    continue;
+                };
+                let key = &rest[..end];
+                if !key.is_empty()
+                    && key
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+                {
+                    keys.push(key.to_string());
+                }
+            }
+        }
+        keys.sort();
+        keys.dedup();
+        keys
     }
 }

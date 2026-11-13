@@ -1,7 +1,8 @@
 //! SADP 平台传输层。
 //!
-//! **这是整个工程唯一允许出现 `cfg(target_os)` 的地方。**
-//! 上层（`sadp-core` / `sadp-cli`）只看到 `Transport` trait、`Family`、`Datagram`。
+//! **socket / 网卡相关的 `cfg(target_os)` 只出现在这里。**
+//! 上层（`sadp-core` / `sadp-cli` / `sadp-gui`）只看到 `Transport` trait、`Family`、`Datagram`；
+//! 调用系统工具（剪贴板、默认浏览器）的平台分支由各自前端按需处理。
 //!
 //! 职责：
 //! - 枚举网卡（含 v4 掩码/广播地址、v6 地址、ifindex）；

@@ -698,8 +698,11 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
 | 真实报文 | 现场设备（DS-2DE4423DW-D/GLT/XM）抓包脱敏为 `tests/fixtures/probe_match_real_ds2de.xml` |
 | 型号展示 | 部分固件 `DeviceType` 是数字编码（196607），展示时回退到 `DeviceDescription`（表格/详情/导出），JSON 保留原始字段 |
 
-仍需 macOS 真机才能完成的部分：本地网络授权弹窗、应用防火墙行为、
-链路本地 IPv6 的 scope 语义、TUI 在 Terminal/iTerm 下的实际渲染。
+macOS 真机验收（2026-11-12，macOS 26 / Apple Silicon）已完成 11/12 项：
+本地网络授权弹窗两态、多网卡、端口占用回退、日志路径、导出/复制、链路本地 IPv6 的
+scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](../.gate2/gate2-report.md)。
+
+仍未覆盖：24h 连续性（第 12 项，电池供电暂缓）、macOS 14/15 与 Intel 真机、macOS 应用防火墙行为。
 
 ### 13.5 三阶段（egui 图形界面）进展
 
@@ -710,8 +713,8 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
 |---|---|---|
 | G0 状态复用 | ✅ 已有基础 | 排序/过滤/可见行早在 `sadp_core::view`，TUI 与 GUI 共用；导出格式化逻辑在 GUI 侧独立实现（CLI 的 `output` 尚未抽公共层） |
 | G1 壳与扫描 | ✅ | `eframe 0.37`（当前最新）窗口 + 扫描线程（`Scanner::poll(200ms)` → crossbeam 通道 → UI drain），暂停/继续 = 停线程/起线程 |
-| G2 表格与详情 | ✅ 基础版 | `egui_extras::TableBuilder` 表格（IP/MAC/型号/来源/激活）、右侧详情、点选行、过滤框、排序键与方向、状态栏与 toast |
-| G3 设置与导出 | 🟡 部分 | 已有 JSON/CSV 导出（写当前目录）与剪贴板复制；网卡/地址族多选与文件对话框（`rfd`）未做，参数走命令行 |
+| G2 表格与详情 | ✅ 基础版 | `egui_extras::TableBuilder` 表格（IP/MAC/型号/来源/激活）、右侧详情、整行单击选中、双击 IP 用系统默认浏览器打开设备 Web 后台、过滤框、排序键与方向、状态栏与 toast |
+| G3 设置与导出 | 🟡 部分 | 已有 JSON/CSV 导出（写当前目录）与剪贴板复制；网卡多选与文件对话框（`rfd`）未做，网卡固定用全部可用接口，地址族 / 端口等参数走命令行 |
 | G4 体验 | 🟡 部分 | 中文字体已用 `fontdb` 从系统注入（macOS 取 PingFang SC 的 TTC face index），深色主题/字体回退顺序未细调 |
 | G5 打包 | ⬜ 未开始 | `.app` 打包与签名公证、Windows MSI |
 
@@ -730,7 +733,7 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
    （CI run 43245594522）。`sadp-gui` 因此按 target 拆分依赖：Windows 关默认特性、启用 glow；
    macOS/Linux 保持默认 wgpu。上游修好后删掉 Cargo.toml 里的 Windows 块即可。
 
-测试：`sadp-gui` 6 个（导出 4 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 111 个）；
+测试：`sadp-gui` 13 个（导出 4 + Web 后台 URL 6 + 源码 i18n key 扫描 1 + 离屏渲染/过滤 2），全量 `cargo test --workspace` 通过（共 118 个）；
 `cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt --check`、`cargo deny check` 通过。
 覆盖率：`sadp-core` 行覆盖 **83.8%**、区域覆盖 82.8%（`cargo llvm-cov -p sadp-core`），满足 Gate 1 的 ≥80% 门槛。
 

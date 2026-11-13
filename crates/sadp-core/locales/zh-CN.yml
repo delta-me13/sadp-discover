@@ -172,6 +172,12 @@ gui:
     export_csv: 导出 CSV
     copy: 复制
     lang: 语言
+  tip:
+    open_web: 双击 IP 在默认浏览器中打开设备 Web 后台
+  status:
+    opened: "已在浏览器中打开 %{url}"
+  error:
+    open_web: "无法打开浏览器：%{reason}"
 
 lang:
   en: English

@@ -1,6 +1,8 @@
 # macOS 适配（二阶段）
 
-> 状态：代码已就绪，两个 Apple target 的交叉编译检查通过；**尚未在 macOS 真机验证**（Gate 2 见文末）。
+> 状态：代码已就绪，两个 Apple target 的交叉编译检查通过。Gate 2 已在 macOS 26 / Apple Silicon
+> 真机通过 11/12 项（第 12 项 24h 连续性因电池供电暂缓）；macOS 14/15 与 Intel 机型仍未覆盖。
+> 证据与结论见 [.gate2/gate2-report.md](../.gate2/gate2-report.md)。
 
 ## 1. 平台差异一览
 

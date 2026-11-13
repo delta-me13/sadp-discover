@@ -175,6 +175,12 @@ gui:
     export_csv: Export CSV
     copy: Copy
     lang: Language
+  tip:
+    open_web: Double-click the IP to open the device web UI in your browser
+  status:
+    opened: "Opened %{url} in your browser"
+  error:
+    open_web: "Cannot open the browser: %{reason}"
 
 lang:
   en: English
