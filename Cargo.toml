@@ -49,7 +49,8 @@ uuid = { version = "1", features = ["v4"] }
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+# 全量 LTO：跨 crate 内联，代价是链接阶段明显变慢（release 只跑一次，值得）。
+lto = "fat"
 strip = true
 codegen-units = 1
 
