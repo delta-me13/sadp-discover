@@ -38,6 +38,10 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          # 缓存键 = job + OS + arch + rustc 版本 + Cargo.toml/Cargo.lock 哈希。
+          # 失败时也保存：否则一次红灯之后，下一轮必然冷启动。
+          cache-on-failure: true
 
       - name: Format
         run: cargo fmt --all -- --check
@@ -68,6 +72,10 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          # 缓存键 = job + OS + arch + rustc 版本 + Cargo.toml/Cargo.lock 哈希。
+          # 失败时也保存：否则一次红灯之后，下一轮必然冷启动。
+          cache-on-failure: true
 
       # 假设备依赖真实网卡的组播回环；GitHub runner 上通常可用，
       # 若被防火墙拦截则该 job 失败，属于环境问题而非代码回归。
