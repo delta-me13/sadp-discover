@@ -7,7 +7,9 @@
 > app 内 CLI 与 GUI 均为 universal（x86_64 + arm64，两个 slice 的 minos 都是 11.0），
 > Intel slice 已用 Rosetta 实际运行验证过。
 > 实现位于 `scripts/macos/bundle.sh`（组装 + 签名）、`scripts/macos/pkg.sh`（打 pkg）、
-> `packaging/macos/Info.plist`；图标由 `packaging/macos/make-icon.py` 生成到 `assets/`。
+> `scripts/macos/dmg.sh`（打 dmg）、`packaging/macos/Info.plist`；
+> 图标由 `packaging/macos/make-icon.py` 生成到 `assets/`。
+> M4 的 dmg 与 SHA256SUMS 已实现并接进 release 流水线；真机验收 8 条里依赖证书的 6/7 尚未执行。
 > 签名/公证（M3）需要证书，尚未执行。
 
 ## 0. 验收标准
@@ -30,7 +32,7 @@
 | 产物 | 内容 | 定位 |
 |---|---|---|
 | `sadp-discover-<ver>-macos.pkg` | `/Applications/sadp-discover.app` + `/usr/local/bin/sadp-discover` | **主产物**，唯一能同时满足两个需求的形态 |
-| `sadp-discover-<ver>-macos.dmg` | .app + `Applications` 软链 | 可选：拒绝安装器的用户，只有 GUI |
+| `sadp-discover-<ver>-macos.dmg` | .app + `Applications` 软链 | 只想要 GUI 的用户（已实现，见 §5.6） |
 | `sadp-discover-<ver>-macos-universal.tar.gz` | 裸 CLI | 保留现状：Homebrew / 脚本 / 容器 |
 
 为什么主产物是 pkg 而不是 dmg：**dmg 无法安全地写 `/usr/local/bin`**。要么让用户手动 `mv`（PATH 需求落不实），要么在 dmg 里塞一个「双击运行我」的脚本（用户基本不点，且被 Gatekeeper 拦）。pkg 是唯一「一次点击，两件事都到位」的载体。
@@ -222,7 +224,7 @@ productsign --sign "$INSTALLER_ID" dist/sadp-discover.pkg dist/sadp-discover-$VE
 - 想加欢迎页/License/安装位置限制就用 `productbuild --distribution`，最小 Distribution XML 只需要 `<pkg-ref>` 指向上面产出的组件包。
 - 注意 `--ownership recommended`，不要出现 root:wheel 以外莫名其妙的属主。
 
-### 5.6 公证 pkg + 可选 dmg
+### 5.6 公证 pkg + dmg
 
 ```bash
 xcrun notarytool submit dist/sadp-discover-$VERSION-macos.pkg \
@@ -231,16 +233,24 @@ xcrun stapler staple dist/sadp-discover-$VERSION-macos.pkg
 spctl -a -vvv -t install dist/sadp-discover-$VERSION-macos.pkg
 ```
 
-dmg（可选）：
+dmg 同样走已有的三个模块，不需要单独的命令：
 
 ```bash
-hdiutil create -volname "sadp-discover" -srcfolder dist/dmg -ov -format UDZO dist/sadp-discover-$VERSION-macos.dmg
-codesign --force --timestamp --sign "$APP_ID" dist/sadp-discover-$VERSION-macos.dmg
-xcrun notarytool submit dist/sadp-discover-$VERSION-macos.dmg ... --wait
-xcrun stapler staple dist/sadp-discover-$VERSION-macos.dmg
+bash scripts/macos/dmg.sh                              # 组镜像 + 签名 dmg 本身
+bash scripts/macos/notarize.sh dist/*.dmg              # 提交 + staple（notarytool 直接收 dmg）
+spctl -a -vvv -t open --context context:primary-signature dist/*.dmg
 ```
 
-`dist/dmg/` 里放 `sadp-discover.app` 和指向 `/Applications` 的软链，不要放安装器脚本。
+三个约束，顺序或载体错了就会得到「能开但没票据」的包：
+
+- **必须在 `bundle.sh` 之后**：镜像里放的是 `dist/sadp-discover.app` 的副本（`ditto` 保留签名元数据）。
+- **必须在 app 的 `notarize.sh` 之后**：staple 的票据在 app 内部，先做镜像等于把无票据的 app 封进去；
+  只公证 dmg 而不公证 app，断网拖拽安装的用户仍然会被 Gatekeeper 拦。
+- **dmg 自己也要签名**（`CODESIGN_IDENTITY` 非空时 `dmg.sh` 自动做）：`spctl` 对 dmg 的判定类型是
+  `open` + primary signature，不签就只认公证结果、拿不到 `source=Notarized Developer ID`。
+
+`dmg.sh` 的镜像内容只有两样：`sadp-discover.app` 与指向 `/Applications` 的软链。
+不放安装器脚本（用户基本不点，且会被 Gatekeeper 拦），也不写 `/usr/local/bin`——那件事 pkg 负责。
 
 ### 5.7 收尾
 
@@ -279,10 +289,11 @@ scripts/macos/
 ├── notarize.sh                   # ✅ 只公证 + staple
 ├── package.sh                    # ✅ 归档 + sha256
 ├── bundle.sh                     # ✅ 组装 .app（Info.plist + 图标 + ad-hoc 签名）
-└── pkg.sh                        # ✅ 打 .pkg（app + /usr/local/bin）
+├── pkg.sh                        # ✅ 打 .pkg（app + /usr/local/bin）
+└── dmg.sh                        # ✅ 打 .dmg（app + Applications 软链 + 可选签名）
 ```
 
-新增 `bundle.sh` / `pkg.sh` 时沿用 `config.sh`，不要另起一套变量。
+新增 `bundle.sh` / `pkg.sh` / `dmg.sh` 时沿用 `config.sh`，不要另起一套变量。
 
 ## 8. 与构建系统的关系
 
@@ -300,7 +311,7 @@ scripts/macos/
 | 归档命名 ↔ 两处重复 | `sadp_tar_name` 一处生成 |
 | 平台假设 ↔ 每个步骤 | `uname` 门槛只留在编排入口 |
 
-如果后续要加 bundle 组装、pkg、dmg，继续往这套模块里加（`bundle.sh` / `pkg.sh`），而不是回到单文件长脚本。**不建议**现在改成 `xtask`：`config.sh` 已经把「事实」和「动作」分开了，迁移到 Rust 只增加代码量，不会消除额外耦合。
+bundle / pkg / dmg 三个交付形态就是这样加进来的（`bundle.sh` / `pkg.sh` / `dmg.sh`），再要加别的继续往这套模块里加，而不是回到单文件长脚本。**不建议**现在改成 `xtask`：`config.sh` 已经把「事实」和「动作」分开了，迁移到 Rust 只增加代码量，不会消除额外耦合。
 
 CI 拆成两条工作流（`.github/workflows/`）：
 

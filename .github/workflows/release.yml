@@ -191,12 +191,31 @@ jobs:
       - name: Notarize .pkg
         run: bash scripts/macos/notarize.sh dist/*.pkg
 
+      # dmg 里放的是「已 staple 的 app」的副本：只公证 dmg 而不公证 app 的话，
+      # 从 dmg 拖进 /Applications 的用户断网启动仍然查不到离线票据。
+      - name: Build .dmg
+        run: bash scripts/macos/dmg.sh
+
+      - name: Notarize .dmg
+        run: bash scripts/macos/notarize.sh dist/*.dmg
+
+      - name: Verify .dmg
+        run: |
+          set -euo pipefail
+          mnt="$RUNNER_TEMP/dmg"
+          mkdir -p "$mnt"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" -noautoopen dist/*.dmg >/dev/null
+          trap 'hdiutil detach "$mnt" >/dev/null 2>&1 || true' EXIT
+          test -d "$mnt/sadp-discover.app"
+          test -L "$mnt/Applications"
+          "$mnt/sadp-discover.app/Contents/MacOS/sadp-discover" --version
+
       # CLI 单独一份 tar.gz，给 Homebrew / 脚本安装用。
       - name: Archive CLI tarball
         run: bash scripts/macos/package.sh dist/sadp-discover
 
       - name: Checksums
-        run: cd dist && shasum -a 256 *.pkg *.tar.gz > SHA256SUMS.txt && cat SHA256SUMS.txt
+        run: cd dist && shasum -a 256 *.pkg *.dmg *.tar.gz > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       # 装一遍再跑：这是唯一能验证「pkg 布局真的对」的步骤
       # （/Applications 下的 app、/usr/local/bin 下的 CLI 都能直接用）。
@@ -212,12 +231,15 @@ jobs:
         run: |
           spctl -a -vvv -t exec dist/sadp-discover.app
           spctl -a -vvv -t install dist/*.pkg
+          # dmg 的判定类型是 open + primary signature，不是 exec。
+          spctl -a -vvv -t open --context context:primary-signature dist/*.dmg
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: |
             dist/*.pkg
+            dist/*.dmg
             dist/*.tar.gz
             dist/SHA256SUMS.txt
           if-no-files-found: error

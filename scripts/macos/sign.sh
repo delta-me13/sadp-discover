@@ -28,8 +28,19 @@ for target in "$@"; do
     sadp_note "ad-hoc 签名 $target"
     codesign --force --sign - "$target"
   else
-    sadp_note "签名 ${target}（hardened runtime + 时间戳）"
-    codesign --force --options runtime --timestamp --sign "$identity" "$target"
+    case "$target" in
+      *.dmg)
+        # 磁盘镜像是容器而不是可执行文件：hardened runtime 对它没有意义，
+        # 带上 --options runtime 只会在 spctl 输出里留一行无关信息。
+        sadp_note "签名 ${target}（时间戳）"
+        codesign --force --timestamp --sign "$identity" "$target"
+        ;;
+      *)
+        sadp_note "签名 ${target}（hardened runtime + 时间戳）"
+        codesign --force --options runtime --timestamp --sign "$identity" "$target"
+        ;;
+    esac
   fi
+  codesign --verify --strict --verbose=2 "$target"
   codesign --verify --strict --verbose=2 "$target"
 done
