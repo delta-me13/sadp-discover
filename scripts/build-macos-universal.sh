@@ -1,73 +1,75 @@
 #!/usr/bin/env bash
-# 构建 macOS 通用二进制（arm64 + x86_64）。
+# 构建 macOS 通用二进制（arm64 + x86_64），可选签名、公证、归档。
 #
-# 必须在 macOS 上运行：lipo / codesign / notarytool 都是 Xcode 命令行工具的一部分。
+# 这是**编排入口**：真正的动作在 scripts/macos/ 下按职责拆开，可单独调用。
+# 环境变量与产物路径保持向后兼容（CI 与文档都按这个契约使用）。
 #
 # 用法：
 #   ./scripts/build-macos-universal.sh
 #   VERSION=0.2.0 ./scripts/build-macos-universal.sh
 #   CODESIGN_IDENTITY="Developer ID Application: Foo (TEAMID)" ./scripts/build-macos-universal.sh
+#   ./scripts/build-macos-universal.sh --build-only     # 只构建，不签名/公证/打包
 #
 # 环境变量：
-#   VERSION             版本号，默认从 Cargo.toml 读取
-#   OUT                 输出目录，默认 dist
-#   CODESIGN_IDENTITY   设置后对产物签名（hardened runtime + 时间戳）
+#   VERSION             版本号，默认从 cargo 读取
+#   OUT / DIST          输出目录，默认 dist
+#   TARGETS             目标架构，默认两个 Apple target
+#   PACKAGES            要构建的包，默认 sadp-cli
+#   PROFILE             cargo profile，默认 release
+#   CODESIGN_IDENTITY   设置后对产物签名（hardened runtime + 时间戳；"-" 为 ad-hoc）
 #   NOTARY_PROFILE      设置后提交公证（需先 xcrun notarytool store-credentials）
+#   ASC_KEY_PATH/ASC_KEY_ID/ASC_ISSUER  用 App Store Connect API Key 公证（CI 用）
+#   SADP_INSTALL_TARGETS=1  缺 target 时允许脚本代为 rustup target add
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/macos/config.sh"
+sadp_init
 
-if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "error: 该脚本只能在 macOS 上运行（需要 lipo）" >&2
-  exit 1
-fi
-
-VERSION="${VERSION:-$(awk -F'"' '/^version = /{print $2; exit}' Cargo.toml)}"
-OUT="${OUT:-dist}"
-TARGETS=(aarch64-apple-darwin x86_64-apple-darwin)
-BIN="$OUT/sadp-discover"
-
-echo "==> building sadp-discover $VERSION (universal)"
-mkdir -p "$OUT"
-
-for target in "${TARGETS[@]}"; do
-  rustup target add "$target" >/dev/null 2>&1 || true
-  echo "==> cargo build --release --target $target"
-  cargo build --release -p sadp-cli --target "$target"
+build_only=0
+for arg in "$@"; do
+  case "$arg" in
+    --build-only) build_only=1 ;;
+    -h|--help)
+      # 只打印文件头的注释块，不把代码漏进帮助里。
+      # 规则顺序有意义：先判断「不是注释就停」，再剥离 # 前缀，
+      # 否则 sub() 改掉 $0 后同一条记录会再命中「非注释」规则而提前退出。
+      awk 'NR == 1 { next } !/^#/ { exit } { sub(/^# ?/, ""); print }' "${BASH_SOURCE[0]}"
+      exit 0
+      ;;
+    *) sadp_die "未知参数：${arg}（支持 --build-only / --help）" ;;
+  esac
 done
 
-echo "==> lipo"
-lipo -create \
-  "target/aarch64-apple-darwin/release/sadp-discover" \
-  "target/x86_64-apple-darwin/release/sadp-discover" \
-  -output "$BIN"
-chmod +x "$BIN"
-lipo -info "$BIN"
-
-if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
-  echo "==> codesign ($CODESIGN_IDENTITY)"
-  codesign --force --options runtime --timestamp \
-    --sign "$CODESIGN_IDENTITY" "$BIN"
-  codesign --verify --verbose=2 "$BIN"
-else
-  echo "==> 跳过签名（未设置 CODESIGN_IDENTITY）"
+# 平台门槛只在这一层：lipo 与 codesign 都是 macOS 专有工具。
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  sadp_die "该脚本只能在 macOS 上运行（需要 lipo）；非 macOS 上可用 TARGETS=<单一 target> 跑 scripts/macos/build.sh"
 fi
 
-ARCHIVE="$OUT/sadp-discover-$VERSION-macos-universal.tar.gz"
-tar -czf "$ARCHIVE" -C "$OUT" sadp-discover
-echo "==> wrote $ARCHIVE"
+sadp_note "sadp-discover ${SADP_VERSION}（targets: ${SADP_TARGETS}, profile: ${SADP_PROFILE}）"
 
-if [[ -n "${NOTARY_PROFILE:-}" ]]; then
-  echo "==> notarize"
-  # notarytool 接受 zip；注意 stapler 只对 .app/.dmg/.pkg 有效，
-  # 裸命令行二进制分发时 Gatekeeper 走在线校验，不需要 staple。
-  ditto -c -k --keepParent "$BIN" "$OUT/sadp-discover-notarize.zip"
-  xcrun notarytool submit "$OUT/sadp-discover-notarize.zip" \
-    --keychain-profile "$NOTARY_PROFILE" --wait
-  rm -f "$OUT/sadp-discover-notarize.zip"
-else
-  echo "==> 跳过公证（未设置 NOTARY_PROFILE）"
+# 把解析结果显式交给子脚本：子脚本各自会重新 init，必须看到同一套值，
+# 否则 OUT/VERSION/TARGETS 只对编排层生效，产物会落回默认目录。
+export DIST="$SADP_DIST"
+export TARGETS="$SADP_TARGETS"
+export PACKAGES="$SADP_PACKAGES"
+export PROFILE="$SADP_PROFILE"
+export VERSION="$SADP_VERSION"
+
+bash "$SADP_ROOT/scripts/macos/build.sh"
+
+artifacts=()
+for pkg in $SADP_PACKAGES; do
+  bin=$(sadp_bin_for_pkg "$pkg") || sadp_die "未知包 $pkg"
+  artifacts+=("$SADP_DIST/$bin")
+done
+
+if (( build_only )); then
+  sadp_note "--build-only：跳过签名、公证与归档"
+  exit 0
 fi
 
-echo "==> done"
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}" bash "$SADP_ROOT/scripts/macos/sign.sh" "${artifacts[@]}"
+bash "$SADP_ROOT/scripts/macos/notarize.sh" "${artifacts[@]}"
+bash "$SADP_ROOT/scripts/macos/package.sh" "${artifacts[@]}"
+
+sadp_note "done"

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>sadp-discover</string>
+	<key>CFBundleDisplayName</key>
+	<string>sadp-discover</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.delta-me13.sadp-discover</string>
+	<key>CFBundleExecutable</key>
+	<string>sadp-discover-gui</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>__BUILD__</string>
+	<key>CFBundleIconFile</key>
+	<string>sadp-discover.icns</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh_CN</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>MIT OR Apache-2.0</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>用于在局域网内发现海康 SADP 设备（UDP 37020 广播与组播）。</string>
+</dict>
+</plist>

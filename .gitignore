@@ -1,6 +1,9 @@
 /target
 /dist
 
+# 图标生成的中间产物（.icns 本身入库，见 assets/）
+packaging/macos/AppIcon.iconset/
+
 # Gate 2 本地验收：脚本与证据入库，第三方依赖和运行数据不入库
 .gate2/pylib/
 .gate2/soak-*/

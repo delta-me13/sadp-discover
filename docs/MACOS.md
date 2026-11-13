@@ -53,8 +53,51 @@ bash scripts/build-macos-universal.sh
 # 产物：dist/sadp-discover-<version>-macos-universal.tar.gz
 ```
 
-脚本会：安装两个 target → 分别构建 → `lipo -create` 合成 → 校验架构 →
-（可选）`codesign` →（可选）`notarytool` 公证。
+编排入口只负责按顺序调用四个可独立执行的模块，产物路径与 `dist/sadp-discover` 保持不变：
+
+| 脚本 | 职责 | 可单独用来 |
+|---|---|---|
+| `scripts/macos/config.sh` | 版本、target 列表、包↔二进制映射、路径（唯一事实来源） | 被 source |
+| `scripts/macos/build.sh` | 构建 + `lipo` 合成 + 架构校验，**不签名不打包** | 只编译 |
+| `scripts/macos/sign.sh` | 对已有产物签名，`-` 表示 ad-hoc | 补签 |
+| `scripts/macos/notarize.sh` | 对已有产物公证 + staple（.app/.dmg/.pkg 才 staple） | 补公证 |
+| `scripts/macos/package.sh` | 归档 + sha256（gzip 时间戳固定，同输入同校验和） | 重打包 |
+| `scripts/macos/bundle.sh` | 组装 `.app`（Info.plist + 图标 + 签名） | 出 app |
+| `scripts/macos/pkg.sh` | 打 `.pkg`（app + `/usr/local/bin` CLI） | 出安装包 |
+
+由此带来的行为变化：
+
+- **不再替你 `rustup target add`**：缺 target 会在动工前直接报错并给出安装命令；要恢复旧行为设 `SADP_INSTALL_TARGETS=1`。
+- **签名为空即跳过**，与原来的「未设置 `CODESIGN_IDENTITY` 就跳过」一致；`CODESIGN_IDENTITY=-` 可做 ad-hoc 签名，本地验证用。
+- 只构建不签名不打包：`bash scripts/build-macos-universal.sh --build-only`。
+- 单架构快速验证（不需要另一个 target）：`TARGETS=aarch64-apple-darwin bash scripts/macos/build.sh`，此时自动跳过 `lipo`。
+- `VERSION` 只决定产物文件名，**不改二进制内嵌版本**（那是 `Cargo.toml` 的事）；两者不一致时会打印一次提醒。
+- 归档可复现：`gzip -n` + 不写扩展属性，同样的输入得到同样的 sha256，便于比对发布物。
+
+### 分发包（.pkg / .app / PATH）
+
+如果目标是「双击 .app 启动 GUI，同时终端里直接有 `sadp-discover`」，
+上面这个 tar.gz 不够用：它没有 app bundle，也不写 `/usr/local/bin`。
+
+```bash
+# GUI 也做通用二进制（或直接用 cargo build -p sadp-gui 出宿主架构的临时版本）
+PACKAGES=sadp-gui TARGETS="aarch64-apple-darwin x86_64-apple-darwin" \
+  bash scripts/macos/build.sh         # -> dist/sadp-discover-gui（x86_64 + arm64）
+bash scripts/macos/bundle.sh          # -> dist/sadp-discover.app
+bash scripts/macos/pkg.sh             # -> dist/sadp-discover-<ver>-macos.pkg
+```
+
+pkg 的 payload 是 `/Applications/sadp-discover.app` + `/usr/local/bin/sadp-discover`；
+两份 CLI 逐字节相同（同一个 CDHash，方便公证票据一并覆盖）。安装需要 root：
+
+```bash
+sudo installer -pkg dist/sadp-discover-<version>-macos.pkg -target /
+```
+
+本地构建默认 **ad-hoc 签名**（`CODESIGN_IDENTITY=-`），能启动、能本地验证，但 Gatekeeper 不认。
+正式分发要设置 `CODESIGN_IDENTITY`，并在 `bundle.sh` / `pkg.sh` 之后对产物跑
+`scripts/macos/notarize.sh`。完整顺序、证书与验收清单见
+[macOS 打包方案](./MACOS-PACKAGING.md)。
 
 ## 3. 权限
 

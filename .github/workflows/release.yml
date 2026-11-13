@@ -1,0 +1,236 @@
+name: release
+
+# 只认 tag：v0.1.0、v1.2.3-rc1（带连字符的自动按 prerelease 发布）。
+# 地址：把「能不能合并」（dev.yml）和「能不能发」彻底分开——
+# 这里才做 release 构建、签名、公证与打包。
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # 发布前的最后一道闸：tag 必须与 Cargo.toml 的版本一致，
+  # 否则会出现「包叫 1.0.0、--version 却报 0.1.0」的发布事故。
+  version:
+    name: version gate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check tag matches Cargo.toml
+        id: check
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          manifest=$(cargo pkgid -p sadp-cli | sed -e 's/.*[#@]//')
+          if [ "$tag" != "$manifest" ]; then
+            echo "::error::tag $GITHUB_REF_NAME 与 Cargo.toml 的 $manifest 不一致，先改版本号再打 tag"
+            exit 1
+          fi
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+
+  # 依赖许可 / 漏洞 / 来源审计。从 dev 挪到这里：PR 上不跑，发布前必须过。
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  windows:
+    name: windows
+    runs-on: windows-latest
+    needs: version
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binaries
+        run: cargo build --release -p sadp-cli -p sadp-gui
+
+      - name: Smoke test
+        run: |
+          .\target\release\sadp-discover.exe --version
+          .\target\release\sadp-discover-gui.exe --version
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path target/release/sadp-discover.exe, target/release/sadp-discover-gui.exe, README.md, LICENSE-MIT, LICENSE-APACHE -DestinationPath "dist/sadp-discover-${{ needs.version.outputs.version }}-windows-x86_64.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+          if-no-files-found: error
+
+  macos:
+    name: macos universal
+    runs-on: macos-latest
+    needs: version
+    env:
+      # 只把「有没有密钥」这个布尔值放进 job 环境；真正的证书/密钥只在需要的 step 里注入，
+      # 避免它们出现在 cargo build 期间的环境变量里（依赖的 build script 也能看到那些变量）。
+      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_KEY_P8 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Import signing identities
+        if: env.HAS_SIGNING == 'true'
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASS=$(openssl rand -hex 16)
+          printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/certs.p12"
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certs.p12" -k "$KEYCHAIN" \
+            -P "$CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASS" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/certs.p12"
+
+      - name: Resolve signing identities
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          set -euo pipefail
+          app_id=$(security find-identity -v -p codesigning | \
+            sed -n 's/.*"\(Developer ID Application.*\)"/\1/p' | head -1)
+          installer_id=$(security find-identity -v | \
+            sed -n 's/.*"\(Developer ID Installer.*\)"/\1/p' | head -1)
+          [ -n "$app_id" ] || { echo "::error::没找到 Developer ID Application 证书"; exit 1; }
+          echo "CODESIGN_IDENTITY=$app_id" >> "$GITHUB_ENV"
+          if [ -n "$installer_id" ]; then
+            echo "INSTALLER_IDENTITY=$installer_id" >> "$GITHUB_ENV"
+          fi
+
+      - name: Prepare notary key
+        if: env.HAS_NOTARY == 'true'
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$NOTARY_KEY_P8" > "$key"
+          {
+            echo "ASC_KEY_PATH=$key"
+            echo "ASC_KEY_ID=$NOTARY_KEY_ID"
+            echo "ASC_ISSUER=$NOTARY_ISSUER"
+          } >> "$GITHUB_ENV"
+
+      - name: Build universal CLI
+        env:
+          TARGETS: aarch64-apple-darwin x86_64-apple-darwin
+        run: bash scripts/macos/build.sh
+
+      - name: Build universal GUI
+        env:
+          TARGETS: aarch64-apple-darwin x86_64-apple-darwin
+          PACKAGES: sadp-gui
+        run: bash scripts/macos/build.sh
+
+      - name: Sign binaries
+        run: bash scripts/macos/sign.sh dist/sadp-discover dist/sadp-discover-gui
+
+      - name: Bundle .app
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: bash scripts/macos/bundle.sh
+
+      # app 必须先在 bundle 里 staple，再进 pkg：
+      # 只公证 pkg 的话，用户装完断网启动会查不到票。
+      - name: Notarize .app
+        run: bash scripts/macos/notarize.sh dist/sadp-discover.app
+
+      - name: Build .pkg
+        run: bash scripts/macos/pkg.sh
+
+      - name: Notarize .pkg
+        run: bash scripts/macos/notarize.sh dist/*.pkg
+
+      # CLI 单独一份 tar.gz，给 Homebrew / 脚本安装用。
+      - name: Archive CLI tarball
+        run: bash scripts/macos/package.sh dist/sadp-discover
+
+      - name: Checksums
+        run: cd dist && shasum -a 256 *.pkg *.tar.gz > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      # 装一遍再跑：这是唯一能验证「pkg 布局真的对」的步骤
+      # （/Applications 下的 app、/usr/local/bin 下的 CLI 都能直接用）。
+      - name: Install smoke test
+        run: |
+          sudo installer -pkg dist/*.pkg -target /
+          /usr/local/bin/sadp-discover --version
+          /Applications/sadp-discover.app/Contents/MacOS/sadp-discover-gui --version
+          which sadp-discover
+
+      - name: Verify Gatekeeper
+        if: env.HAS_NOTARY == 'true'
+        run: |
+          spctl -a -vvv -t exec dist/sadp-discover.app
+          spctl -a -vvv -t install dist/*.pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            dist/*.pkg
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    needs: [version, windows, macos]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          args=(--title "sadp-discover $VERSION" --generate-notes)
+          # 带连字符的 tag（v1.2.3-rc1）按预发布处理。
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" "${args[@]}" release/*

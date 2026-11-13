@@ -1,0 +1,75 @@
+name: dev
+
+# 日常检查：能不能合并。
+# 只跑「测试 + 假设备端到端」，不产出任何产物——产物构建、签名、公证都在 release.yml，
+# 那是 tag 触发的事，没必要每次 push 都跑一遍双架构 + 公证。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+# 连续 push 时只保留最新一轮：避免同一分支上多个完整构建并行（runner 也省）。
+concurrency:
+  group: dev-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-15 与 macos-latest(=macos-26) 覆盖两代系统；
+        # Intel 由交叉检查与 release 的通用二进制覆盖（macos-14 镜像已于 2026-10 退役）。
+        os: [windows-latest, macos-15, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Cross-check Intel macOS target
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo check --workspace --target x86_64-apple-darwin
+
+      - name: Test
+        run: cargo test --workspace
+
+  # 假设备端到端只在 Windows runner 上跑：macOS 15+ 的本地网络权限在托管 runner 上
+  # 没人去点"允许"，组播收不到回包（同一用例连续两轮都失败，见 run 43256691672）。
+  # 真机 macOS 上该用例是通过的（Gate 2 用假设备验证过），属环境限制而非代码回归。
+  e2e:
+    name: e2e (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # 假设备依赖真实网卡的组播回环；GitHub runner 上通常可用，
+      # 若被防火墙拦截则该 job 失败，属于环境问题而非代码回归。
+      - name: Fake device end-to-end
+        run: cargo test -p sadp-fake-device -- --ignored --nocapture

@@ -17,6 +17,7 @@
 - ✅ **CLI / TUI**：双栈发现、跨栈去重、JSON·CSV、中英双语、日志落盘
 - ✅ **macOS**：Gate 2 清单 11/12（24h 连续性待跑），通用二进制脚本
 - ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 复制 / 语言切换 / 日志目录；设置面板可多选网卡、地址族、窗口/周期/端口；导出走系统「另存为」，深/浅主题可切换；整行单击看详情，双击 IP 开设备 Web 后台
+- ✅ **CI**：`dev`（test + e2e，不产生产物）与 `release`（仅 `v*` tag：版本闸门 → Windows zip / macOS universal `.app`+`.pkg`+`tar.gz` → GitHub Release）
 - 🟡 **真机（Windows）**：Win11 + 球机 DS-2DE4423DW-D/GLT/XM 已通过默认发现、多网卡/VPN 隔离、端口占用回退与双语检查；IPC/NVR、Win10 与防火墙待补，详见 [.gate1/gate1-report.md](.gate1/gate1-report.md)
 - ⏳ **待硬件**：IPC/NVR 真机、Win10 主机、IPv6 双栈真机；IPv6 组播地址抓包确认
 
@@ -37,13 +38,40 @@ cargo build --release -p sadp-cli
 # macOS 通用二进制（arm64 + x86_64，需在 Mac 上运行）
 bash scripts/build-macos-universal.sh
 # 产物：dist/sadp-discover-<version>-macos-universal.tar.gz
+# 只构建、不签名不打包：bash scripts/build-macos-universal.sh --build-only
+# 单架构快速验证（缺另一个 target 时）：TARGETS=aarch64-apple-darwin bash scripts/macos/build.sh
+
+# macOS 分发包（.app + .pkg，CLI 同时装到 /usr/local/bin）
+PACKAGES=sadp-gui TARGETS="aarch64-apple-darwin x86_64-apple-darwin" \
+  bash scripts/macos/build.sh          # GUI 通用二进制
+bash scripts/macos/bundle.sh && bash scripts/macos/pkg.sh
+# 产物：dist/sadp-discover.app、dist/sadp-discover-<version>-macos.pkg
+# 默认 ad-hoc 签名；正式分发需 CODESIGN_IDENTITY + notarize.sh
 
 # 图形界面（三阶段，egui）
 cargo build --release -p sadp-gui
 # 产物：target/release/sadp-discover-gui
 ```
 
-macOS 的权限、签名与公证说明见 [docs/MACOS.md](docs/MACOS.md)。
+macOS 的权限、签名与公证说明见 [docs/MACOS.md](docs/MACOS.md)；
+分发用 `.pkg`（装 `/Applications/sadp-discover.app` + `/usr/local/bin/sadp-discover`）的方案见
+[docs/MACOS-PACKAGING.md](docs/MACOS-PACKAGING.md)。
+
+## 发布
+
+CI 分成两条工作流，互不干扰：
+
+| 工作流 | 触发 | 做什么 |
+|---|---|---|
+| `dev` | push `main` / PR | `test`（fmt、clippy、Intel 交叉检查、单元测试）+ `e2e`（Windows 假设备）；不产出任何产物 |
+| `release` | **仅 `v*` tag** | 版本闸门 → cargo-deny → Windows zip / macOS universal `.app`+`.pkg`+`tar.gz` → GitHub Release |
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+tag 必须等于 `cargo pkgid -p sadp-cli` 的版本，否则 `release` 在版本闸门就失败；
+带连字符的 tag（`v1.2.3-rc1`）自动按 prerelease 发布。
 
 ## 用法
 

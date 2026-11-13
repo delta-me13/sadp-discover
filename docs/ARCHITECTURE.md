@@ -201,7 +201,7 @@ sadp-discover/
 ├─ xtask/                     # 构建/打包/假设备（fake-device）
 ├─ tests/fixtures/            # 抓包得到的 XML 样本（脱敏）
 ├─ docs/adr/                  # 决策记录
-└─ .github/workflows/         # windows / macos 矩阵
+└─ .github/workflows/         # dev（test/e2e）与 release（tag-only 打包）
 ```
 
 依赖方向（严格单向）：
@@ -701,7 +701,7 @@ CI 关键点：假设备播放的报文与真机结果走**同一套断言**，�
 | 平台差异收敛 | 无需平台专用 socket 代码：接收用通配地址，出口用 `IP_MULTICAST_IF`；`IP_BOUND_IF` 按设计不引入（理由见 `docs/MACOS.md`） |
 | 权限诊断 | 新增「0 设备 + 0 个 SADP 响应报文」判定，macOS 上给出本地网络权限提示，其它平台给防火墙提示 |
 | 通用二进制 | `scripts/build-macos-universal.sh`（双架构构建 + lipo + 可选签名/公证） |
-| CI | `macos-15` / `macos-latest`（Apple Silicon）测试矩阵 + `x86_64-apple-darwin` 交叉检查；每个 OS 只构建一次 release 产物（Windows CLI+GUI、macOS 通用 CLI + GUI）、`cargo-deny` 依赖审计 |
+| CI | `dev.yml`：`macos-15` / `macos-latest` 测试矩阵 + `x86_64-apple-darwin` 交叉检查 + Windows 假设备 e2e；`release.yml`：仅 `v*` tag 触发，版本闸门 → cargo-deny → Windows CLI+GUI zip / macOS 通用 CLI+GUI 的 `.app`+`.pkg`+`tar.gz` → GitHub Release |
 | 文档 | `docs/MACOS.md`：权限、签名、公证、Gate 2 清单、故障排查 |
 | 真实报文 | 现场设备（DS-2DE4423DW-D/GLT/XM）抓包脱敏为 `tests/fixtures/probe_match_real_ds2de.xml` |
 | 型号展示 | 部分固件 `DeviceType` 是数字编码（196607），展示时回退到 `DeviceDescription`（表格/详情/导出），JSON 保留原始字段 |
@@ -755,5 +755,5 @@ scope 语义与 TUI 渲染均已实测通过，详见 [.gate2/gate2-report.md](.
 3. Gate 1 剩余项：接入 IPC/NVR、Win10 主机、开启 IPv6 的真机补矩阵与双栈；
    管理员权限下验证防火墙首启；接电源跑 `.gate1/soak/start-24h.ps1`；
    macOS 14/15 真机跑 Gate 2 清单（`docs/MACOS.md` §5）。
-4. GUI G5：Windows MSI 与 macOS `.app` 打包、签名公证；需要 WiX 与 cargo-bundle，
-   并补一条只在 tag 上触发的打包 CI。
+4. GUI G5：macOS `.app`/`.pkg` 与 tag-only 发布流水线已完成（`.github/workflows/release.yml`），
+   剩余是证书接入后的签名/公证验证与 Intel 真机；Windows 侧还差 MSI（WiX）。
