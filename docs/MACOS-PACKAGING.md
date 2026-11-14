@@ -9,8 +9,10 @@
 > 实现位于 `scripts/macos/bundle.sh`（组装 + 签名）、`scripts/macos/pkg.sh`（打 pkg）、
 > `scripts/macos/dmg.sh`（打 dmg）、`packaging/macos/Info.plist`；
 > 图标由 `packaging/macos/make-icon.py` 生成到 `assets/`。
-> M4 的 dmg 与 SHA256SUMS 已实现并接进 release 流水线；真机验收 8 条里依赖证书的 6/7 尚未执行。
-> 签名/公证（M3）需要证书，尚未执行。
+> M4 的 dmg 与 SHA256SUMS 已实现并接进 release 流水线；pkg 是带向导的 product archive
+> （`packaging/macos/installer/`），授权文案有中英两份 `InfoPlist.strings`，
+> GUI 的致命错误在双击启动时会弹窗。
+> 真机验收 8 条里依赖证书的 6/7 尚未执行；签名/公证（M3）需要证书，尚未执行。
 
 ## 0. 验收标准
 
@@ -50,9 +52,11 @@ sadp-discover.app/
     │   ├── sadp-discover-gui           # CFBundleExecutable，universal
     │   └── sadp-discover               # CLI（随包同版本），universal
     ├── Resources/
-    │   ├── sadp-discover.icns          # 需要新增（仓库当前没有图标资产）
-    │   └── zh-Hans.lproj/
-    │       └── InfoPlist.strings       # 本地化 NSLocalNetworkUsageDescription
+    │   ├── sadp-discover.icns          # packaging/macos/make-icon.py 生成
+    │   ├── zh-Hans.lproj/
+    │   │   └── InfoPlist.strings       # 本地化 NSLocalNetworkUsageDescription
+    │   └── en.lproj/
+    │       └── InfoPlist.strings       # 缺了它，英文系统会看到中文授权弹窗
     └── _CodeSignature/                 # codesign 生成，不要手工创建
 ```
 
@@ -89,7 +93,8 @@ CLI 放 `Contents/MacOS/` 而不是 `Contents/Resources/bin/`：可执行位、`
   <key>CFBundleShortVersionString</key>    <string><ver></string>
   <key>CFBundleVersion</key>               <string><build></string>
   <key>CFBundleIconFile</key>              <string>sadp-discover.icns</string>
-  <key>CFBundleDevelopmentRegion</key>     <string>zh_CN</string>
+  <key>CFBundleDevelopmentRegion</key>     <string>zh-Hans</string>
+  <key>CFBundleLocalizations</key>         <array><string>zh-Hans</string><string>en</string></array>
   <key>LSMinimumSystemVersion</key>        <string>11.0</string>
   <key>LSApplicationCategoryType</key>     <string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key>       <true/>
@@ -107,6 +112,21 @@ CLI 放 `Contents/MacOS/` 而不是 `Contents/Resources/bin/`：可执行位、`
 - `NSLocalNetworkUsageDescription` 只对 **.app 生效**。CLI 从终端跑时，TCC 把权限记在终端 App 上，与本文无关（见 MACOS.md §3）。
 - `LSMinimumSystemVersion` 要与实际链接的 deployment target 一致，见 §6 的 `MACOSX_DEPLOYMENT_TARGET`。**不要**写得比实际低，否则在旧系统上会以 `Symbol not found` 崩，而不是给出「系统版本过低」的提示。
 - 菜单栏里 App 菜单显示的是 `CFBundleName`，不是二进制名，所以这里必须写 `sadp-discover`。
+
+### 本地化（InfoPlist.strings）
+
+能本地化的只有「面向用户的字符串」，实现方式是 `Resources/<lang>.lproj/InfoPlist.strings`：
+
+```
+"NSLocalNetworkUsageDescription" = "用于在局域网内发现海康 SADP 设备：…";
+```
+
+- 文件名固定，语言由 `.lproj` 目录名决定（`zh-Hans`、`en`），系统按用户偏好挑一个；
+- 没匹配到的语言**静默回落到 Info.plist 里的值**，所以 `en` 系统要单独给一份，否则看到的是中文；
+- `CFBundleDevelopmentRegion` 要与其中一种一致（现在是 `zh-Hans`），`CFBundleLocalizations` 负责声明支持范围；
+- `.strings` 是纯文本，写错了不会报错、只会静默回落——`bundle.sh` 里用 `plutil -lint` 挡了一道。
+
+不改名 `CFBundleDisplayName` 是故意的：Finder 里的名字与窗口标题、二进制名保持一致，避免「三处三个名字」。
 
 ## 4. CLI 进 PATH：两条路，推荐第二条
 
@@ -206,23 +226,36 @@ spctl -a -vvv -t exec "$APP"        # 必须 accepted / Notarized Developer ID
 
 ### 5.5 打 pkg
 
+实现是 `scripts/macos/pkg.sh`，两段式：
+
 ```bash
-# payload 就是一棵以 / 为根的树
+# ① payload 是一棵以 / 为根的树
 rm -rf dist/pkgroot && mkdir -p dist/pkgroot/Applications dist/pkgroot/usr/local/bin
-cp -R "$APP" dist/pkgroot/Applications/
-cp dist/bin/sadp-discover dist/pkgroot/usr/local/bin/
+ditto --norsrc "$APP" dist/pkgroot/Applications/sadp-discover.app
+ditto --norsrc "$APP/Contents/MacOS/sadp-discover" dist/pkgroot/usr/local/bin/sadp-discover
 
-pkgbuild --root dist/pkgroot \
-  --identifier io.github.delta-me13.sadp-discover \
-  --version "$VERSION" --ownership recommended \
-  dist/sadp-discover.pkg
+# ② component 包：只有 payload 与安装位置
+pkgbuild --root dist/pkgroot --identifier "${SADP_PKG_ID}.pkg" --version "$VERSION" \
+  --ownership recommended --install-location / "$work/component.pkg"
 
-productsign --sign "$INSTALLER_ID" dist/sadp-discover.pkg dist/sadp-discover-$VERSION-macos.pkg
+# ③ 套上安装向导：欢迎页 / 说明 / 许可协议 / 最低系统版本
+productbuild --distribution "$work/Distribution.xml" \
+  --package-path "$work" --resources packaging/macos/installer/resources \
+  "dist/sadp-discover-$VERSION-macos.pkg"
+
+# ④ 可选：用 Developer ID Installer 签
+productsign --sign "$INSTALLER_ID" "$final" "$final.signed"
 ```
 
-- 两个证书是**不同的**：`Developer ID Application` 签代码，`Developer ID Installer` 签 pkg。只有前者的话 `productsign` 会失败。
-- 想加欢迎页/License/安装位置限制就用 `productbuild --distribution`，最小 Distribution XML 只需要 `<pkg-ref>` 指向上面产出的组件包。
+为什么不是一步 `pkgbuild`：只做 component 的话，用户双击看到的是「此软件包将安装…」的白板向导。
+`Distribution.xml` 才是那个能写欢迎页、许可协议、最低系统版本、安装位置限制的东西，代价是必须把
+component 包再包一层（`product archive`），产物因此是一层壳 + 一个内嵌 pkg。
+
+- 两个证书是**不同的**：`Developer ID Application` 签代码，`Developer ID Installer` 签 pkg。只有前者 `productsign` 会失败。
+- `Distribution.xml` 里的 product id 与 `pkg-ref` id 是两种身份：后者必须等于 `pkgbuild --identifier`，写错 `productbuild` 直接报错找不到组件包。
+- `<volume-check>` 的 `min="11.0"` 要与 `Info.plist` 的 `LSMinimumSystemVersion` 一起改，否则会出现「装得上、打不开」。
 - 注意 `--ownership recommended`，不要出现 root:wheel 以外莫名其妙的属主。
+- payload 里的 `._*` 是 `com.apple.provenance` 扩展属性被 pkgbuild 编码成 AppleDouble 的结果，内核对这个属性不允许删除（`xattr -d` 静默失败），属无损噪音。
 
 ### 5.6 公证 pkg + dmg
 
@@ -264,11 +297,11 @@ tar.gz 也别漏了签名：`dist/bin/sadp-discover` 已经是签好的、lipo �
 
 这几条不属于「打包脚本」，但会直接决定包能不能用：
 
-1. **GUI 的失败路径在 Finder 下是静默的**。`crates/sadp-gui/src/main.rs` 里绑定失败走 `eprintln!` + `exit(2)`；双击启动时 stderr 没人看。改为：检测到非 tty（或从 bundle 启动）时用 `rfd::MessageDialog` 弹窗说明原因。这是「点击 .app 启动的是 GUI」体验上最容易被投诉的一点。
+1. ~~**GUI 的失败路径在 Finder 下是静默的**~~：已修。绑定失败与窗口初始化失败都走 `fatal()`——照旧写日志与 stderr，另外在**由 LaunchServices 启动**时（环境变量 `__CFBundleIdentifier` 存在，即 Finder 双击或 `open`）弹 `rfd::MessageDialog`。刻意不用 `isatty(stderr)`：脚本把输出重定向到日志时同样不是 tty，那种场景弹窗会把自动化卡死。
 2. **确认没有相对路径依赖**。Finder 启动的 cwd 是 `/`。目前日志走 `dirs`、导出走 `rfd` 默认目录、无外部资源引用，已满足；新增功能时别引入 `./locales` 之类。
 3. **`MACOSX_DEPLOYMENT_TARGET` 固定**为 `11.0`，并和 `LSMinimumSystemVersion` 对齐。可以在 xtask/脚本里 export，也可以给 GUI crate 加 `build.rs` 注入——这是 build.rs 的正当用法（编译期决定链接参数），与上一轮讨论一致：**发布动作不进 build.rs，编译参数可以**。
 4. **需要新增图标资产**：`assets/sadp-discover.png`（1024×1024），以及生成 `.icns` 的脚本。没有它 app 是通用空白图标，Dock 和「关于」窗口都会很难看。
-5. **`InfoPlist.strings` 本地化**（可选但建议）：中文系统显示中文授权文案，英文系统显示英文。缺省只给中文会让 en-US 用户看到中文弹窗。
+5. ~~**`InfoPlist.strings` 本地化**~~：已做。`packaging/macos/{zh-Hans,en}.lproj/InfoPlist.strings`，`bundle.sh` 复制进 `Contents/Resources/` 并用 `plutil -lint` 校验（见 §3 末尾）。
 
 ## 7. 仓库需要新增的文件
 
@@ -277,7 +310,17 @@ packaging/macos/
 ├── Info.plist                    # ✅ 占位符 __VERSION__ / __BUILD__，bundle.sh 里替换
 ├── make-icon.py                  # ✅ PNG -> iconset -> icns（Pillow）
 ├── AppIcon.iconset/              # 生成物，已 gitignore
-├── Distribution.xml              # ⬜ 待做：productbuild 的欢迎页/许可协议
+├── zh-Hans.lproj/
+│   └── InfoPlist.strings         # ✅ 中文授权文案
+├── en.lproj/
+│   └── InfoPlist.strings         # ✅ 英文授权文案
+├── installer/
+│   ├── Distribution.xml          # ✅ productbuild 的向导定义（占位符由 pkg.sh 替换）
+│   └── resources/
+│       ├── welcome.html          # ✅ 首屏：装了什么、装到哪
+│       ├── readme.html           # ✅ 「安装前请阅读」：权限、PATH、卸载
+│       ├── conclusion.html       # ✅ 完成页
+│       └── LICENSE.txt           # ✅ 许可协议页（MIT 全文 + Apache-2.0 指向）
 └── entitlements.plist            # ⬜ 可选：当前不需要任何 entitlement
 assets/
 ├── sadp-discover.png             # ✅ 1024pt 母版

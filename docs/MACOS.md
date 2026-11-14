@@ -63,7 +63,7 @@ bash scripts/build-macos-universal.sh
 | `scripts/macos/notarize.sh` | 对已有产物公证 + staple（.app/.dmg/.pkg 才 staple） | 补公证 |
 | `scripts/macos/package.sh` | 归档 + sha256（gzip 时间戳固定，同输入同校验和） | 重打包 |
 | `scripts/macos/bundle.sh` | 组装 `.app`（Info.plist + 图标 + 签名） | 出 app |
-| `scripts/macos/pkg.sh` | 打 `.pkg`（app + `/usr/local/bin` CLI） | 出安装包 |
+| `scripts/macos/pkg.sh` | 打 `.pkg`（app + `/usr/local/bin` CLI，带安装向导） | 出安装包 |
 | `scripts/macos/dmg.sh` | 打 `.dmg`（app + `Applications` 软链，可选签名） | 出磁盘镜像 |
 
 由此带来的行为变化：
@@ -99,6 +99,11 @@ sudo installer -pkg dist/sadp-discover-<version>-macos.pkg -target /
 dmg 是给「只要 GUI」的用户准备的：镜像里是已签名的 app 加一个指向 `/Applications` 的软链，
 拖过去就装完，**不碰 `/usr/local/bin`**。所以 dmg 必须在 `bundle.sh`（以及需要离线可用时的
 `notarize.sh` staple）之后再做——镜像里放的是 app 的副本，先做会把没有票据的版本封进去。
+
+pkg 不是一步 `pkgbuild` 出来的：先用 `pkgbuild` 出 component 包，再用 `productbuild`
+套上 `packaging/macos/installer/Distribution.xml`。所以双击安装包会看到欢迎页、说明、
+许可协议，并且会挡掉 macOS 11 以下的系统。app 内 `Contents/Resources/{zh-Hans,en}.lproj/InfoPlist.strings`
+提供中英两套「本地网络」授权文案，按系统语言选用。
 
 本地构建默认 **ad-hoc 签名**（`CODESIGN_IDENTITY=-`），能启动、能本地验证，但 Gatekeeper 不认。
 正式分发要设置 `CODESIGN_IDENTITY`，并在 `bundle.sh` / `pkg.sh` 之后对产物跑

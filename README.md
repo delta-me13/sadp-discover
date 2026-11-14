@@ -84,7 +84,7 @@ macOS 有两个产物，按需求选一个：
 | `.dmg` | 只有 `.app`（拖进 Applications 完成安装） | 只需要 GUI、不想动系统目录 |
 
 ```bash
-# .pkg：一次装好 app 与 PATH 里的 CLI
+# .pkg：一次装好 app 与 PATH 里的 CLI（带安装向导：欢迎页、说明、许可协议、macOS 11+ 检查）
 sudo installer -pkg sadp-discover-<version>-macos.pkg -target /
 
 # .dmg：打开后把 sadp-discover.app 拖进 Applications
