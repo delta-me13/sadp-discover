@@ -5,15 +5,18 @@
 <style>
   body { font: 13px -apple-system, "PingFang SC", sans-serif; margin: 0; }
   p { margin: 0 0 10px; line-height: 1.6; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f2f2f7; padding: 1px 4px; border-radius: 3px; }
+  ul { margin: 0 0 10px; padding-left: 18px; }
+  li { margin: 0 0 4px; line-height: 1.6; }
 </style>
 </head>
 <body>
-<p>这个安装包会把 <b>sadp-discover</b> 装到两个位置：</p>
-<p>
-  · <code>/Applications/sadp-discover.app</code> —— 双击启动图形界面；<br>
-  · <code>/usr/local/bin/sadp-discover</code> —— 终端里直接可用的命令行版本。
-</p>
-<p>两者是同一份扫描实现，版本与结果一致。安装到系统卷需要管理员密码。</p>
+<p><b>sadp-discover</b> 是一个跨平台的海康（Hikvision）SADP 设备发现工具：
+在局域网内向 UDP 37020 发送探测，把设备上报的 IP、MAC、型号、固件与激活状态整理成表格。</p>
+<ul>
+  <li><b>只读</b>：只发探测、只读设备公开上报的字段，不修改任何设备配置；</li>
+  <li><b>双栈</b>：IPv4 与 IPv6 同时探测，多网卡可分别选择，结果按 MAC 跨栈去重；</li>
+  <li><b>两种界面</b>：图形界面看表格与详情；命令行提供 TUI 与 JSON / CSV 导出，中英双语。</li>
+</ul>
+<p>详细说明见项目 README。</p>
 </body>
 </html>

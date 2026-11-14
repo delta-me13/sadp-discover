@@ -317,8 +317,8 @@ packaging/macos/
 ├── installer/
 │   ├── Distribution.xml          # ✅ productbuild 的向导定义（占位符由 pkg.sh 替换）
 │   └── resources/
-│       ├── welcome.html          # ✅ 首屏：装了什么、装到哪
-│       ├── readme.html           # ✅ 「安装前请阅读」：权限、PATH、卸载
+│       ├── welcome.html          # ✅ 首屏：一句话定位 + 三条功能要点（不写安装细节）
+│       ├── readme.html           # ✅ 「安装前请阅读」：安装位置、首次运行权限、卸载
 │       ├── conclusion.html       # ✅ 完成页
 │       └── LICENSE.txt           # ✅ 许可协议页（MIT 全文 + Apache-2.0 指向）
 └── entitlements.plist            # ⬜ 可选：当前不需要任何 entitlement
