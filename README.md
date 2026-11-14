@@ -17,7 +17,7 @@
 - ✅ **CLI / TUI**：双栈发现、跨栈去重、JSON·CSV、中英双语、日志落盘
 - ✅ **macOS**：Gate 2 清单 11/12（24h 连续性待跑），通用二进制脚本
 - ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 复制 / 语言切换 / 日志目录；设置面板可多选网卡、地址族、窗口/周期/端口；导出走系统「另存为」，深/浅主题可切换；整行单击看详情，双击 IP 开设备 Web 后台
-- ✅ **CI**：`dev`（test + e2e，不产生产物）与 `release`（仅 `v*` tag：版本闸门 → Windows zip / macOS universal `.app`+`.pkg`+`tar.gz` → GitHub Release）
+- ✅ **CI**：`dev`（test + e2e + Windows 打包自检）与 `release`（仅 `v*` tag：版本闸门 → Windows `zip`+`setup.exe` / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release）
 - 🟡 **真机（Windows）**：Win11 + 球机 DS-2DE4423DW-D/GLT/XM 已通过默认发现、多网卡/VPN 隔离、端口占用回退与双语检查；IPC/NVR、Win10 与防火墙待补，详见 [.gate1/gate1-report.md](.gate1/gate1-report.md)
 - ⏳ **待硬件**：IPC/NVR 真机、Win10 主机、IPv6 双栈真机；IPv6 组播地址抓包确认
 
@@ -31,9 +31,15 @@
 需要 Rust 1.90+。
 
 ```bash
-# Windows（MSVC）
+# Windows（MSVC）：只出 exe
 cargo build --release -p sadp-cli
 # 产物：target/release/sadp-discover.exe
+
+# Windows 分发包（便携 zip + Inno Setup 安装器，需在 Windows 上运行）
+pwsh -File scripts/build-windows.ps1
+# 产物：dist/sadp-discover-<version>-windows-x86_64.zip
+#       dist/windows/sadp-discover-<version>-windows-x86_64-setup.exe
+# 只要 zip、不装 Inno Setup：pwsh -File scripts/build-windows.ps1 -SkipInstaller
 
 # macOS 通用二进制（arm64 + x86_64，需在 Mac 上运行）
 bash scripts/build-macos-universal.sh
@@ -57,6 +63,8 @@ cargo build --release -p sadp-gui
 macOS 的权限、签名与公证说明见 [docs/MACOS.md](docs/MACOS.md)；
 分发用 `.pkg`（装 `/Applications/sadp-discover.app` + `/usr/local/bin/sadp-discover`）的方案见
 [docs/MACOS-PACKAGING.md](docs/MACOS-PACKAGING.md)。
+Windows 的产物布局、安装器的注册表/PATH 行为、exe 内嵌资源见
+[docs/WINDOWS-PACKAGING.md](docs/WINDOWS-PACKAGING.md)。
 
 ## 发布
 
@@ -64,8 +72,8 @@ CI 分成两条工作流，互不干扰：
 
 | 工作流 | 触发 | 做什么 |
 |---|---|---|
-| `dev` | push `main` / PR | `test`（fmt、clippy、Intel 交叉检查、单元测试）+ `e2e`（Windows 假设备）；不产出任何产物 |
-| `release` | **仅 `v*` tag** | 版本闸门 → cargo-deny → Windows zip / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release |
+| `dev` | push `main` / PR | `test`（fmt、clippy、Intel 交叉检查、单元测试）+ `e2e`（Windows 假设备）；push 到 `main` 时额外跑 `package`（Windows 打包 + 装/卸一遍），不产出对外发布的产物 |
+| `release` | **仅 `v*` tag** | 版本闸门 → cargo-deny → Windows `zip`+`setup.exe` / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release |
 
 ```bash
 git tag v0.1.0 && git push origin v0.1.0
@@ -75,6 +83,32 @@ tag 必须等于 `cargo pkgid -p sadp-cli` 的版本，否则 `release` 在版�
 带连字符的 tag（`v1.2.3-rc1`）自动按 prerelease 发布。
 
 ## 安装与卸载
+
+### Windows
+
+| 产物 | 装什么 | 适合 |
+|---|---|---|
+| `…-setup.exe` | `%LOCALAPPDATA%\Programs\sadp-discover` 下的两个 exe，开始菜单快捷方式，CLI 加进用户 PATH | **推荐**：不需要管理员权限，卸载走「设置 → 应用」 |
+| `…-windows-x86_64.zip` | 同样这几个文件，解压即用 | 便携、免安装、丢进 U 盘 |
+
+```powershell
+# 安装器：默认就装到当前用户，不弹 UAC；/VERYSILENT 用于脚本与批量部署
+.\sadp-discover-<version>-windows-x86_64-setup.exe
+.\sadp-discover-<version>-windows-x86_64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES
+
+# 便携包
+Expand-Archive sadp-discover-<version>-windows-x86_64.zip -DestinationPath .
+.\sadp-discover-<version>-windows-x86_64\sadp-discover-gui.exe
+```
+
+装完**新开一个命令行窗口**才看得到 PATH 里的 `sadp-discover`。首次扫描时 Windows
+防火墙会问是否允许访问网络，请勾选「专用网络」并允许——拒绝之后设备回包会被丢掉，
+界面上就是「一台设备都没有」。
+
+卸载：`设置 → 应用 → 已安装的应用` 里找到 sadp-discover，或运行安装目录下的
+`unins000.exe`；PATH 里的条目会一并删除。
+
+### macOS
 
 macOS 有两个产物，按需求选一个：
 

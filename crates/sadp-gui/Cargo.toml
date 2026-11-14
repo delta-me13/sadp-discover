@@ -42,6 +42,17 @@ eframe = { version = "0.37", default-features = false, features = [
   "glow",
   "links",
 ] }
+# 只用到 AttachConsole / SetStdHandle / GetFileType：GUI 以 windows 子系统发布，
+# 从命令行启动时要自己挂回父进程的控制台，否则 --version 的输出没人收。
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Console",
+] }
+
+# 把图标、清单与版本信息嵌进 exe（非 Windows 目标下 build.rs 直接跳过）。
+[build-dependencies]
+embed-resource = "3.0"
 
 [lints]
 workspace = true

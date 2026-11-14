@@ -29,7 +29,7 @@ icon="$SADP_ROOT/assets/sadp-discover.icns"
 
 [[ -f $gui ]] || sadp_die "找不到 GUI 二进制：${gui}（先 cargo build --release -p sadp-gui）"
 [[ -f $cli ]] || sadp_die "找不到 CLI 二进制：${cli}（先 bash scripts/macos/build.sh）"
-[[ -f $icon ]] || sadp_die "缺少图标：assets/sadp-discover.icns（运行 python3 packaging/macos/make-icon.py）"
+[[ -f $icon ]] || sadp_die "缺少图标：assets/sadp-discover.icns（运行 python3 packaging/make-icon.py）"
 
 sadp_note "组装 ${app}"
 rm -rf "$app"

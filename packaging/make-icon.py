@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""生成 macOS 应用图标：assets/sadp-discover.png + assets/sadp-discover.icns。
+"""生成应用图标：assets/sadp-discover.png / .icns（macOS）/ .ico（Windows）。
 
 图标语义：一块雷达屏上扫出一台设备——与「SADP 发现」对应。
 所有尺寸都由一个 1024pt 的母版缩放，母版本身按 4x 超采样绘制后降采样，
 避免 16pt 下出现锯齿。
 
 用法（仓库根目录）：
-    python3 packaging/macos/make-icon.py
-需要 Pillow 与 macOS 自带的 iconutil。
+    python3 packaging/make-icon.py
+需要 Pillow；.icns 额外需要 macOS 自带的 iconutil（其它平台跳过这一步，
+.ico 不受影响）。
 """
 
 import shutil
@@ -17,7 +18,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "assets"
 SCALE = 4
 SIZE = 1024
@@ -140,6 +141,9 @@ def draw_icon():
     return canvas.resize((SIZE, SIZE), Image.LANCZOS)
 
 
+# Windows 的 .ico 只需要这些尺寸：16/32 用于列表，48 用于桌面，256 用于大图标视图。
+ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
 ICONSET = [
     (16, "icon_16x16.png"),
     (32, "icon_16x16@2x.png"),
@@ -161,7 +165,11 @@ def main():
     master.save(png)
     print(f"wrote {png}")
 
-    iconset = ROOT / "packaging" / "macos" / "AppIcon.iconset"
+    ico = ASSETS / "sadp-discover.ico"
+    master.save(ico, sizes=[(px, px) for px in ICO_SIZES])
+    print(f"wrote {ico}")
+
+    iconset = ROOT / "packaging" / "AppIcon.iconset"
     if iconset.exists():
         shutil.rmtree(iconset)
     iconset.mkdir(parents=True)

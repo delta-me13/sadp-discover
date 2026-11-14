@@ -8,7 +8,7 @@
 > Intel slice 已用 Rosetta 实际运行验证过。
 > 实现位于 `scripts/macos/bundle.sh`（组装 + 签名）、`scripts/macos/pkg.sh`（打 pkg）、
 > `scripts/macos/dmg.sh`（打 dmg）、`packaging/macos/Info.plist`；
-> 图标由 `packaging/macos/make-icon.py` 生成到 `assets/`。
+> 图标由 `packaging/make-icon.py` 生成到 `assets/`（同时产出 Windows 用的 `.ico`）。
 > M4 的 dmg 与 SHA256SUMS 已实现并接进 release 流水线；pkg 是带向导的 product archive
 > （`packaging/macos/installer/`），授权文案有中英两份 `InfoPlist.strings`，
 > GUI 的致命错误在双击启动时会弹窗。
@@ -52,7 +52,7 @@ sadp-discover.app/
     │   ├── sadp-discover-gui           # CFBundleExecutable，universal
     │   └── sadp-discover               # CLI（随包同版本），universal
     ├── Resources/
-    │   ├── sadp-discover.icns          # packaging/macos/make-icon.py 生成
+    │   ├── sadp-discover.icns          # packaging/make-icon.py 生成
     │   ├── zh-Hans.lproj/
     │   │   └── InfoPlist.strings       # 本地化 NSLocalNetworkUsageDescription
     │   └── en.lproj/
@@ -306,34 +306,52 @@ tar.gz 也别漏了签名：`dist/bin/sadp-discover` 已经是签好的、lipo �
 ## 7. 仓库需要新增的文件
 
 ```
-packaging/macos/
-├── Info.plist                    # ✅ 占位符 __VERSION__ / __BUILD__，bundle.sh 里替换
-├── make-icon.py                  # ✅ PNG -> iconset -> icns（Pillow）
-├── AppIcon.iconset/              # 生成物，已 gitignore
-├── zh-Hans.lproj/
-│   └── InfoPlist.strings         # ✅ 中文授权文案
-├── en.lproj/
-│   └── InfoPlist.strings         # ✅ 英文授权文案
-├── installer/
-│   ├── Distribution.xml          # ✅ productbuild 的向导定义（占位符由 pkg.sh 替换）
-│   └── resources/
-│       ├── welcome.html          # ✅ 首屏：一句话定位 + 三条功能要点（不写安装细节）
-│       ├── readme.html           # ✅ 「安装前请阅读」：安装位置、首次运行权限、卸载
-│       ├── conclusion.html       # ✅ 完成页
-│       └── LICENSE.txt           # ✅ 许可协议页（MIT 全文 + Apache-2.0 指向）
-└── entitlements.plist            # ⬜ 可选：当前不需要任何 entitlement
+packaging/
+├── make-icon.py                    # ✅ PNG -> iconset -> icns，顺带产出 .ico（Pillow）
+├── AppIcon.iconset/                # 生成物，已 gitignore
+├── windows/                        # ✅ Windows 侧，详见 docs/WINDOWS-PACKAGING.md
+│   ├── app.manifest                # ✅ asInvoker / PerMonitorV2 / longPathAware / 兼容 Win10-11
+│   ├── app.rc.in                   # ✅ 图标 + 清单 + 版本信息模板，build.rs 填占位符
+│   ├── build-resources.rs          # ✅ 两个 crate 共用的 build.rs 逻辑
+│   └── installer/
+│       ├── sadp-discover.iss       # ✅ Inno Setup 安装器（按用户安装 + PATH + 卸载器）
+│       └── readme.txt              # ✅ 安装前说明页：安装位置、防火墙、卸载
+└── macos/
+    ├── Info.plist                  # ✅ 占位符 __VERSION__ / __BUILD__，bundle.sh 里替换
+    ├── zh-Hans.lproj/
+    │   └── InfoPlist.strings       # ✅ 中文授权文案
+    ├── en.lproj/
+    │   └── InfoPlist.strings       # ✅ 英文授权文案
+    ├── installer/
+    │   ├── Distribution.xml        # ✅ productbuild 的向导定义（占位符由 pkg.sh 替换）
+    │   └── resources/
+    │       ├── welcome.html        # ✅ 首屏：一句话定位 + 三条功能要点（不写安装细节）
+    │       ├── readme.html         # ✅ 「安装前请阅读」：安装位置、首次运行权限、卸载
+    │       ├── conclusion.html     # ✅ 完成页
+    │       └── LICENSE.txt         # ✅ 许可协议页（MIT 全文 + Apache-2.0 指向）
+    └── entitlements.plist          # ⬜ 可选：当前不需要任何 entitlement
 assets/
-├── sadp-discover.png             # ✅ 1024pt 母版
-└── sadp-discover.icns            # ✅ make-icon.py 生成，入库
-scripts/macos/
-├── config.sh                     # ✅ 版本/target/包名/路径的唯一事实来源
-├── build.sh                      # ✅ 构建 + lipo，不签名
-├── sign.sh                       # ✅ 只签名
-├── notarize.sh                   # ✅ 只公证 + staple
-├── package.sh                    # ✅ 归档 + sha256
-├── bundle.sh                     # ✅ 组装 .app（Info.plist + 图标 + ad-hoc 签名）
-├── pkg.sh                        # ✅ 打 .pkg（app + /usr/local/bin）
-└── dmg.sh                        # ✅ 打 .dmg（app + Applications 软链 + 可选签名）
+├── sadp-discover.png               # ✅ 1024pt 母版
+├── sadp-discover.icns              # ✅ make-icon.py 生成，入库（macOS）
+└── sadp-discover.ico               # ✅ make-icon.py 生成，入库（Windows）
+scripts/
+├── build-macos-universal.sh        # ✅ macOS 编排入口
+├── build-windows.ps1               # ✅ Windows 编排入口（zip + 安装器 + 校验和）
+├── windows/
+│   ├── config.ps1                  # ✅ 版本/路径/文件名的唯一事实来源
+│   ├── build.ps1                   # ✅ 构建 + 版本探针 + 资源检查
+│   ├── package.ps1                 # ✅ payload + 便携 zip
+│   ├── installer.ps1               # ✅ Inno Setup 编译
+│   └── smoke-install.ps1           # ✅ 装/跑/卸冒烟
+└── macos/
+    ├── config.sh                   # ✅ 版本/target/包名/路径的唯一事实来源
+    ├── build.sh                    # ✅ 构建 + lipo，不签名
+    ├── sign.sh                     # ✅ 只签名
+    ├── notarize.sh                 # ✅ 只公证 + staple
+    ├── package.sh                  # ✅ 归档 + sha256
+    ├── bundle.sh                   # ✅ 组装 .app（Info.plist + 图标 + ad-hoc 签名）
+    ├── pkg.sh                      # ✅ 打 .pkg（app + /usr/local/bin）
+    └── dmg.sh                      # ✅ 打 .dmg（app + Applications 软链 + 可选签名）
 ```
 
 新增 `bundle.sh` / `pkg.sh` / `dmg.sh` 时沿用 `config.sh`，不要另起一套变量。

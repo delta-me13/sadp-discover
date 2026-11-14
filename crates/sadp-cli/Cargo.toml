@@ -29,6 +29,10 @@ time = { workspace = true }
 dirs = { workspace = true }
 unicode-width = { workspace = true }
 
+# 把图标、清单与版本信息嵌进 exe（非 Windows 目标下 build.rs 直接跳过）。
+[build-dependencies]
+embed-resource = "3.0"
+
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"

@@ -3,8 +3,13 @@
 //! 只负责参数、日志、传输层绑定与窗口；扫描与渲染逻辑在 app 模块。
 //! 事件契约与 TUI 完全相同（ScanEvent），因此两条前端可以并跑对照。
 
+// Windows 上以 windows 子系统发布：双击时不再附送一个空的黑色控制台窗口。
+// debug 构建保持控制台，`cargo run` 与测试照旧能看日志。
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod app;
 mod browser;
+mod console;
 mod export;
 mod fonts;
 mod logging;
@@ -19,6 +24,9 @@ use sadp_net::InterfaceSelector;
 use sadp_net::udp::{UdpConfig, UdpTransport};
 
 fn main() -> anyhow::Result<()> {
+    // 必须在任何输出之前：clap 的 --help/--version 与日志都要走这里挂上的控制台。
+    console::attach_parent_console();
+
     let matches = cli().get_matches();
     let verbose = matches.get_count("verbose");
     let _guard = logging::init(None, verbose, true);

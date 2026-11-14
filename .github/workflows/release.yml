@@ -65,24 +65,24 @@ jobs:
           # cache-on-failure 只保证「同一 tag 重跑」能命中。
           cache-on-failure: true
 
-      - name: Build release binaries
-        run: cargo build --release -p sadp-cli -p sadp-gui
-
-      - name: Smoke test
-        run: |
-          .\target\release\sadp-discover.exe --version
-          .\target\release\sadp-discover-gui.exe --version
-
-      - name: Package zip
+      # 构建 → 便携 zip → Inno Setup 安装器 → 校验和，全在脚本里，
+      # 与 dev 的打包自检跑的是同一份代码（这里只多一个 tag 版本闸门）。
+      - name: Build, package, installer
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path target/release/sadp-discover.exe, target/release/sadp-discover-gui.exe, README.md, LICENSE-MIT, LICENSE-APACHE -DestinationPath "dist/sadp-discover-${{ needs.version.outputs.version }}-windows-x86_64.zip"
+        run: ./scripts/build-windows.ps1
+
+      # 装到一个临时目录、跑两个 exe、再静默卸载：只有这一步能证明安装器布局是对的。
+      - name: Install smoke test
+        shell: pwsh
+        run: ./scripts/windows/smoke-install.ps1
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/windows/*.exe
+            dist/SHA256SUMS-windows.txt
           if-no-files-found: error
 
   macos:
@@ -253,6 +253,16 @@ jobs:
         with:
           path: release
           merge-multiple: true
+
+      # 两个构建 job 各自写过的 SHA256SUMS 会被 merge-multiple 覆盖掉一个，
+      # 所以在这里按「最终的产物清单」重新算一遍，只留这一份。
+      - name: Regenerate checksums
+        run: |
+          set -euo pipefail
+          cd release
+          rm -f SHA256SUMS*.txt
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Create GitHub release
         env:

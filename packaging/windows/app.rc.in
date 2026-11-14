@@ -1,0 +1,46 @@
+// sadp-discover 的 Windows 资源模板。
+//
+// crates/sadp-cli/build.rs 与 crates/sadp-gui/build.rs 读取这个文件，把 @占位符@
+// 换成实际值（版本号、绝对路径），写进 OUT_DIR 后再交给 rc.exe 编译。
+// 所以这里**不要**写相对路径：生成的 .rc 在 OUT_DIR 里，相对路径会指错地方。
+//
+// 三样东西：
+//   1 ICON       —— 资源管理器、任务栏、开始菜单快捷方式用的图标
+//   1 24         —— 应用清单（RT_MANIFEST），DPI 感知与免 UAC 都在里面
+//   1 VERSIONINFO —— 文件属性里的「详细信息」，也是安装器显示版本号的来源
+
+1 ICON "@ICON@"
+
+1 24 "@MANIFEST@"
+
+1 VERSIONINFO
+FILEVERSION @VER_NUM@
+PRODUCTVERSION @VER_NUM@
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        // 040904b0 = 美国英语 / Unicode。这里刻意只写 ASCII：
+        // rc.exe 按系统代码页解释源文件，写中文会在部分构建机上变乱码。
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "delta-me13"
+            VALUE "FileDescription", "@DESCRIPTION@"
+            VALUE "FileVersion", "@VERSION@"
+            VALUE "InternalName", "@INTERNAL_NAME@"
+            VALUE "LegalCopyright", "sadp-discover contributors, MIT OR Apache-2.0"
+            VALUE "OriginalFilename", "@ORIGINAL_FILENAME@"
+            VALUE "ProductName", "sadp-discover"
+            VALUE "ProductVersion", "@VERSION@"
+            VALUE "Comments", "https://github.com/delta-me13/sadp-discover"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 0x4b0
+    END
+END
