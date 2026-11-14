@@ -100,9 +100,25 @@ jobs:
         with:
           cache-on-failure: true
 
+      # 这个仓库没有 gh token，runner 上的日志下载不了；失败时把尾巴塞进
+      # GitHub 的 annotation（公开仓库可以匿名读），否则只能看到一个「红」。
       - name: Build, package, installer
         shell: pwsh
-        run: ./scripts/build-windows.ps1
+        run: |
+          $output = ''
+          $failed = $false
+          try {
+            $output = & ./scripts/build-windows.ps1 *>&1 | Out-String
+          } catch {
+            $failed = $true
+            $output = $output + [Environment]::NewLine + ($_ | Out-String)
+          }
+          Write-Host $output
+          if ($failed -or $LASTEXITCODE -ne 0) {
+            $tail = $output.Substring([Math]::Max(0, $output.Length - 2000)) -replace '\r?\n', '%0A'
+            Write-Host "::error title=windows-build::$tail"
+            exit 1
+          }
 
       - name: Install smoke test
         shell: pwsh

@@ -1,13 +1,14 @@
-// sadp-discover 的 Windows 资源模板。
+// Windows resources for sadp-discover.
 //
-// crates/sadp-cli/build.rs 与 crates/sadp-gui/build.rs 读取这个文件，把 @占位符@
-// 换成实际值（版本号、绝对路径），写进 OUT_DIR 后再交给 rc.exe 编译。
-// 所以这里**不要**写相对路径：生成的 .rc 在 OUT_DIR 里，相对路径会指错地方。
+// crates/sadp-cli/build.rs and crates/sadp-gui/build.rs read this template,
+// substitute the @placeholders@ (version, absolute paths) and hand the result
+// to rc.exe. Keep this file pure ASCII: rc.exe reads .rc with the build
+// machine's ANSI code page, so any non-ASCII byte here can corrupt the output.
 //
-// 三样东西：
-//   1 ICON       —— 资源管理器、任务栏、开始菜单快捷方式用的图标
-//   1 24         —— 应用清单（RT_MANIFEST），DPI 感知与免 UAC 都在里面
-//   1 VERSIONINFO —— 文件属性里的「详细信息」，也是安装器显示版本号的来源
+// Three resources:
+//   1 ICON        - Explorer / taskbar / shortcut icon
+//   1 24          - application manifest (RT_MANIFEST): DPI awareness, asInvoker
+//   1 VERSIONINFO - file properties -> "Details", also read by the installer
 
 1 ICON "@ICON@"
 
@@ -24,8 +25,7 @@ FILESUBTYPE 0x0L
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
-        // 040904b0 = 美国英语 / Unicode。这里刻意只写 ASCII：
-        // rc.exe 按系统代码页解释源文件，写中文会在部分构建机上变乱码。
+        // 040904b0 = US English / Unicode. ASCII only, for the same reason as above.
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "delta-me13"
