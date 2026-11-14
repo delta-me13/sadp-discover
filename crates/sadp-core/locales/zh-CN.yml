@@ -168,6 +168,7 @@ error:
   permission: "权限被拒：%{message}"
   no_interface: "没有可用网卡：%{message}"
   bind: "无法绑定 UDP 端口 %{port}：%{reason}"
+  window: "窗口初始化失败：%{message}"
   no_devices: 未发现设备
   hint:
     no_sadp_packets: "没有收到任何 SADP 响应。请确认设备与主机在同一二层网段，且防火墙放行 UDP 37020。"

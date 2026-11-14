@@ -30,10 +30,7 @@ fn main() -> anyhow::Result<()> {
     let local_port = matches.get_one::<u16>("local-port").copied();
     let transport = match bind_transport(&cfg, local_port) {
         Ok(transport) => transport,
-        Err(err) => {
-            eprintln!("{}", tr_args("error.net", &[("message", &err.to_string())]));
-            std::process::exit(2);
-        }
+        Err(err) => fatal(&tr_args("error.net", &[("message", &err.to_string())])),
     };
     // 设置面板改端口/网卡/地址族后，需要按新配置重新绑定传输层。
     let factory: app::TransportFactory =
@@ -47,7 +44,7 @@ fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    eframe::run_native(
+    let result = eframe::run_native(
         "sadp-discover",
         options,
         Box::new(move |cc| {
@@ -58,8 +55,49 @@ fn main() -> anyhow::Result<()> {
                 Some(factory),
             )))
         }),
-    )
-    .map_err(|err| anyhow::anyhow!("窗口初始化失败: {err}"))
+    );
+    // 窗口起不来时 eframe 的错误只在 stderr 里，双击启动同样没人看得到。
+    if let Err(err) = result {
+        fatal(&tr_args("error.window", &[("message", &err.to_string())]));
+    }
+    Ok(())
+}
+
+/// 致命错误的唯一出口：日志 + stderr，用户点开应用时再补一个弹窗。
+///
+/// 双击 .app 时 stderr 没有接收者，只 eprintln 等于「点了没反应」——
+/// 用户只看到 Dock 图标闪一下，日志在 ~/Library/Application Support 里没人会去找。
+fn fatal(message: &str) -> ! {
+    tracing::error!(%message, "致命错误");
+    eprintln!("{message}");
+    if interactive_launch() {
+        rfd::MessageDialog::new()
+            .set_level(rfd::MessageLevel::Error)
+            .set_title("sadp-discover")
+            .set_description(message)
+            .set_buttons(rfd::MessageButtons::Ok)
+            .show();
+    }
+    std::process::exit(2);
+}
+
+/// 这次启动是不是「用户点开的应用」，而不是终端或脚本里跑起来的。
+///
+/// macOS 上用 LaunchServices 注入的 `__CFBundleIdentifier` 判断：Finder 双击与 `open`
+/// 都会设置它，直接从终端执行二进制不会。**不用 isatty(stderr)**——脚本把输出重定向到
+/// 日志文件时同样不是 tty，那种场景下弹窗会把自动化卡死；反过来终端里调试时也不该弹窗。
+///
+/// 其他平台没有这个变量，退回到「没有控制台 = 双击启动」的判断。
+fn interactive_launch() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("__CFBundleIdentifier").is_some()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        use std::io::IsTerminal;
+        !std::io::stderr().is_terminal()
+    }
 }
 
 /// 按配置绑定 UDP 传输层；初始启动与设置变更共用。
