@@ -102,20 +102,23 @@ jobs:
 
       # 这个仓库没有 gh token，runner 上的日志下载不了；失败时把尾巴塞进
       # GitHub 的 annotation（公开仓库可以匿名读），否则只能看到一个「红」。
+      # 先落盘再读：脚本抛异常时管道里的缓冲会一起丢掉。
       - name: Build, package, installer
         shell: pwsh
         run: |
-          $output = ''
-          $failed = $false
+          $log = Join-Path $env:RUNNER_TEMP 'build-windows.log'
+          $code = 0
           try {
-            $output = & ./scripts/build-windows.ps1 *>&1 | Out-String
+            & ./scripts/build-windows.ps1 *> $log
+            $code = $LASTEXITCODE
           } catch {
-            $failed = $true
-            $output = $output + [Environment]::NewLine + ($_ | Out-String)
+            $code = 1
+            Add-Content -Path $log -Value ($_ | Out-String)
           }
-          Write-Host $output
-          if ($failed -or $LASTEXITCODE -ne 0) {
-            $tail = $output.Substring([Math]::Max(0, $output.Length - 2000)) -replace '\r?\n', '%0A'
+          Get-Content -Path $log -Tail 40 | Write-Host
+          if ($code -ne 0) {
+            $text = (Get-Content -Path $log -Raw)
+            $tail = $text.Substring([Math]::Max(0, $text.Length - 3000)) -replace '\r?\n', '%0A'
             Write-Host "::error title=windows-build::$tail"
             exit 1
           }
