@@ -67,14 +67,14 @@ ChangesEnvironment=yes
 ShowLanguageDialog=auto
 
 [Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; 只挂英文：Inno 6.7 的 Languages\ 目录里还没有 ChineseSimplified.isl
+; （社区翻译是 7.x 才并进主干的，见 §6 的说明）。
+; 页面内容照旧是中文：安装前说明（readme.txt）与项目 README 都是中文。
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
 AddToPath=Add sadp-discover to PATH
-AddToPath.chinesesimplified=把 sadp-discover 加入 PATH（方便在命令行里直接用）
 ModifyEnvironment=Environment
-ModifyEnvironment.chinesesimplified=环境变量
 
 [Tasks]
 Name: "addtopath"; Description: "{cm:AddToPath}"; GroupDescription: "{cm:ModifyEnvironment}"

@@ -36,8 +36,12 @@ PATH 的增删写在 `[Code]` 里而不是 `[Registry]`：`[Registry]` 在卸载
 命令行窗口不会跟着变，得新开一个。
 
 安装器带向导：欢迎 → 许可（MIT）→ 安装前说明（安装位置/首次运行/卸载）→ 选择目录 →
-任务（PATH、桌面图标）→ 安装 → 完成。界面语言在简体中文与英文之间自动选择，
-简体中文的翻译来自 Inno Setup 自带的 `Languages\ChineseSimplified.isl`。
+任务（PATH、桌面图标）→ 安装 → 完成。
+
+**向导界面目前只有英文**：Inno Setup 6.7 的 `Languages\` 目录里没有
+`ChineseSimplified.isl`（简体中文是社区翻译，7.0 之后才并进主干），拿不到就只能退回
+`Default.isl`。装前说明页、项目 README、程序界面都是中文，缺的只是「下一步/安装」
+这类按钮文案。等 runner 的 Inno 升到 7.x，或者仓库里自带一份 .isl，就能切回中文。
 
 ## 3. exe 上的资源
 
