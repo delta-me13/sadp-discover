@@ -54,12 +54,16 @@ fn embed_resources(internal_name: &str, original_filename: &str, description: &s
 
 /// rc.exe 按自己的当前目录解析相对路径，而生成的 .rc 在 OUT_DIR 里，
 /// 所以图标和清单一律换成绝对路径。
+///
+/// 分隔符必须是正斜杠：rc.exe 把带引号的资源文件名当 C 字符串过一遍转义，
+/// `D:\a\...` 里的 `\a` 会被当成响铃（BEL），路径就变成 `D:` + BEL + `...`，
+/// 报 `RC2135: file not found`。Windows API 一样认正斜杠。
 fn absolute(path: &std::path::Path) -> String {
     std::path::absolute(path)
         .unwrap_or_else(|_| path.to_path_buf())
         .display()
         .to_string()
-        .replace('/', "\\")
+        .replace('\\', "/")
 }
 
 /// "0.1.0" / "0.1.0-rc.1" → "0,1,0"：VERSIONINFO 只收三个数字段。
