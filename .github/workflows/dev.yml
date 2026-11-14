@@ -82,36 +82,36 @@ jobs:
       - name: Fake device end-to-end
         run: cargo test -p sadp-fake-device -- --ignored --nocapture
 
-    # Windows 打包自检：只在 push 到 main 时跑，PR 保持快。
-    # 打包脚本、Inno Setup 安装器、PATH 增删都走一遍，不然这些代码只在打 tag 时
-    # 才会被执行，坏了要等到发布当天才发现。
-    package-windows:
-      name: package (windows)
-      if: github.event_name == 'push'
-      runs-on: windows-latest
-      steps:
-        - uses: actions/checkout@v4
+  # Windows 打包自检：只在 push 到 main 时跑，PR 保持快。
+  # 打包脚本、Inno Setup 安装器、PATH 增删都走一遍，不然这些代码只在打 tag 时
+  # 才会被执行，坏了要等到发布当天才发现。
+  package-windows:
+    name: package (windows)
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
 
-        - name: Install Rust
-          uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-        - name: Cache cargo
-          uses: Swatinem/rust-cache@v2
-          with:
-            cache-on-failure: true
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
-        - name: Build, package, installer
-          shell: pwsh
-          run: ./scripts/build-windows.ps1
+      - name: Build, package, installer
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
 
-        - name: Install smoke test
-          shell: pwsh
-          run: ./scripts/windows/smoke-install.ps1
+      - name: Install smoke test
+        shell: pwsh
+        run: ./scripts/windows/smoke-install.ps1
 
-        - uses: actions/upload-artifact@v4
-          with:
-            name: windows-package
-            path: |
-              dist/*.zip
-              dist/windows/*.exe
-            retention-days: 3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: |
+            dist/*.zip
+            dist/windows/*.exe
+          retention-days: 3
