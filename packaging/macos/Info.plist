@@ -21,7 +21,14 @@
 	<key>CFBundleIconFile</key>
 	<string>sadp-discover.icns</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>zh_CN</string>
+	<string>zh-Hans</string>
+	<!-- 声明支持的本地化：系统据此在 Resources/<lang>.lproj 里找 InfoPlist.strings。
+	     未列出的语言一律回落到 Info.plist 里写的默认值。 -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>zh-Hans</string>
+		<string>en</string>
+	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
 	<key>LSApplicationCategoryType</key>

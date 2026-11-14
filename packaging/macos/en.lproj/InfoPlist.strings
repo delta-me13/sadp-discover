@@ -1,0 +1,5 @@
+/* English: overrides the localizable values in Info.plist.
+   Key names must match Info.plist exactly, otherwise the system falls back to its values. */
+
+/* The "Local Network" permission prompt shown before the first scan on macOS 15+. */
+"NSLocalNetworkUsageDescription" = "Used to discover Hikvision SADP devices on the local network by sending broadcast/multicast probes to UDP 37020. Only publicly advertised device information is read.";

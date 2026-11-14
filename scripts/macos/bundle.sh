@@ -40,7 +40,22 @@ install -m 644 "$SADP_ROOT/packaging/macos/Info.plist" "$app/Contents/Info.plist
 sed -i '' -e "s/__VERSION__/${SADP_VERSION}/g" -e "s/__BUILD__/${BUILD_NUMBER:-1}/g" "$app/Contents/Info.plist"
 printf 'APPL????' > "$app/Contents/PkgInfo"
 install -m 644 "$icon" "$app/Contents/Resources/sadp-discover.icns"
+
+# InfoPlist.strings 本地化：每个 <lang>.lproj 一份，系统按用户的偏好语言挑一个。
+# 缺失的语言回落到 Info.plist 里的默认字符串（中文），所以 en 系统必须带 en.lproj，
+# 否则英文用户会看到中文授权弹窗。
+for lproj in "$SADP_ROOT"/packaging/macos/*.lproj; do
+  [[ -d $lproj ]] || continue
+  lang=$(basename "$lproj")
+  install -d "$app/Contents/Resources/${lang}"
+  install -m 644 "$lproj"/*.strings "$app/Contents/Resources/${lang}/"
+done
 plutil -lint "$app/Contents/Info.plist"
+# .strings 是纯文本，拼错了不会报错、只会静默回落到默认值——在这里挡一道。
+for strings in "$app"/Contents/Resources/*.lproj/InfoPlist.strings; do
+  [[ -f $strings ]] || continue
+  plutil -lint "$strings" >/dev/null || sadp_die "InfoPlist.strings 格式错误：${strings}"
+done
 
 identity=${CODESIGN_IDENTITY:--}
 sign() {
