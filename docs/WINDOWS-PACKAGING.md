@@ -106,3 +106,23 @@ GUI 用 `#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "w
 - **x86 / ARM64**：只出 `x86_64`。ARM64 Windows 能通过 x64 仿真跑，没做原生包。
 - **防火墙规则**：不做自动加规则——那需要管理员权限，与「按用户安装」冲突。
   首次运行时由系统弹窗询问，说明页里也写了手动补规则的命令。
+
+## 7. CI 里验证了什么
+
+`dev` 工作流在 push 到 `main` 时跑 `package (windows)`（PR 不跑，省 runner 时间），
+`release` 在打 tag 时跑同一套脚本。两条都会做：
+
+| 检查 | 手段 |
+|---|---|
+| 二进制能启动、`--version` 有输出 | `build.ps1` 用 `Start-Process` 重定向 stdout 再比对退出码——GUI 是子系统进程，`&` 拿不到它的输出 |
+| 资源真的嵌进去了 | 读 `VersionInfo.FileVersion`；为空说明 rc.exe 没编进去（图标/清单/版本会一起缺失） |
+| 安装器能装 | `/VERYSILENT /SUPPRESSMSGBOXES /DIR=<临时目录>`，检查两个 exe、开始菜单快捷方式、HKCU 的 PATH |
+| 装完能跑 | 对安装目录里的两个 exe 再跑一次 `--version` |
+| 能卸干净 | 跑 `unins000.exe /VERYSILENT`，轮询等文件消失，再确认 PATH 里没有残留 |
+
+首次跑通时 `package (windows)` 一共 367 秒，其中 301 秒是全量 LTO 的冷编译，
+冒烟本身只占 5 秒。
+
+`dev` 的这条 job 把失败日志的尾部塞进 GitHub annotation（`::error`）：
+仓库没有 gh token，runner 的日志下载不了，annotation 是公开仓库里唯一能匿名读到
+错误原文的通道。
