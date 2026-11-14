@@ -14,6 +14,9 @@ set -euo pipefail
 # build.sh / package.sh 不需要跟着改。
 SADP_PACKAGES_DEFAULT="sadp-cli"
 SADP_TARGETS_DEFAULT="aarch64-apple-darwin x86_64-apple-darwin"
+# pkg 的身份：component 包在它后面加 ".pkg"，product（安装包本身）用原值。
+# packaging/macos/installer/Distribution.xml 里的两处 id 必须与这里一致。
+SADP_PKG_ID="io.github.delta-me13.sadp-discover"
 
 sadp_bin_for_pkg() {
   case "$1" in

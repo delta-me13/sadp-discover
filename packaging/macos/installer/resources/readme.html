@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 12px -apple-system, "PingFang SC", sans-serif; margin: 0; }
+  h3 { font-size: 13px; margin: 14px 0 6px; }
+  p, li { line-height: 1.6; margin: 0 0 6px; }
+  ul { margin: 0 0 8px; padding-left: 18px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f2f2f7; padding: 1px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h3>装了什么</h3>
+<ul>
+  <li><code>/Applications/sadp-discover.app</code>：图形界面（通用二进制，Apple Silicon 与 Intel 通用）</li>
+  <li><code>/usr/local/bin/sadp-discover</code>：命令行版本，与 app 内的可执行文件逐字节相同</li>
+</ul>
+
+<h3>首次运行</h3>
+<p>第一次扫描时系统会请求「本地网络」权限——这是访问局域网广播所必需的，拒绝后需要去
+系统设置 → 隐私与安全性 → 本地网络 里重新打开。</p>
+
+<h3>安装之后</h3>
+<p>新开一个终端窗口（已经开着的窗口不会刷新 PATH），然后：</p>
+<p><code>sadp-discover --version</code></p>
+<p>只想看图形界面的话，直接从启动台或 Finder 打开 sadp-discover 即可。</p>
+
+<h3>卸载</h3>
+<p>这个包没有卸载器，删掉两个路径即可（详见项目 README）：</p>
+<p><code>sudo rm -rf /Applications/sadp-discover.app /usr/local/bin/sadp-discover</code></p>
+</body>
+</html>

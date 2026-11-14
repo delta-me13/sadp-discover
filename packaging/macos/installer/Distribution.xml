@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  productbuild 的安装向导定义。
+  pkg.sh 在打最终 .pkg 时会把下面的版本号与组件包名占位符替换掉，再交给 productbuild；
+  资源文件（welcome/readme/conclusion/LICENSE.txt）从同级的 resources/ 目录取。
+
+  两处 id 不能混：
+    - product 的 id 是「这个安装包」的身份；
+    - pkg-ref 的 id 是内部 component 包的身份，必须与 pkgbuild 的 identifier 参数一致，
+      否则 productbuild 找不到组件包，直接报错。
+  （XML 注释里不能出现连续两个连字符，所以这里不写命令行参数的原样写法。）
+-->
+<installer-gui-script minSpecVersion="2">
+	<title>sadp-discover</title>
+	<organization>io.github.delta-me13</organization>
+
+	<!-- 只允许装到系统卷：/Applications 与 /usr/local/bin 都在本地系统上，
+	     装到别的卷既没有意义，还会让 PATH 里的那份指向一台不存在的机器。 -->
+	<domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>
+
+	<!-- 没有可选组件：一个 pkg 就是 app + CLI，别让用户在复选框里做无意义的选择。 -->
+	<options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+
+	<!-- 与 Info.plist 的 LSMinimumSystemVersion 对齐，避免在 10.x 上装完打不开。 -->
+	<volume-check>
+		<allowed-os-versions>
+			<os-version min="11.0"/>
+		</allowed-os-versions>
+	</volume-check>
+
+	<product id="io.github.delta-me13.sadp-discover" version="__VERSION__"/>
+
+	<welcome file="welcome.html" mime-type="text/html"/>
+	<readme file="readme.html" mime-type="text/html"/>
+	<license file="LICENSE.txt" mime-type="text/plain"/>
+	<conclusion file="conclusion.html" mime-type="text/html"/>
+
+	<choices-outline>
+		<line choice="default">
+			<line choice="io.github.delta-me13.sadp-discover.pkg"/>
+		</line>
+	</choices-outline>
+	<choice id="default"/>
+	<choice id="io.github.delta-me13.sadp-discover.pkg" visible="false">
+		<pkg-ref id="io.github.delta-me13.sadp-discover.pkg"/>
+	</choice>
+	<pkg-ref id="io.github.delta-me13.sadp-discover.pkg" version="__VERSION__" onConclusion="none">__COMPONENT__</pkg-ref>
+</installer-gui-script>
