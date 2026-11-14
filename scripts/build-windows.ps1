@@ -17,7 +17,7 @@ param(
     [switch]$SkipInstaller
 )
 
-. (Join-Path $PSScriptRoot 'config.ps1')
+. (Join-Path $PSScriptRoot 'windows/config.ps1')
 $cfg = Get-SadpConfig
 
 Write-Step "sadp-discover $($cfg.Version)（$($cfg.Arch)，输出：$($cfg.Dist)）"
