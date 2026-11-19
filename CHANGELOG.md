@@ -33,6 +33,9 @@
 - macOS `.pkg` 安装报成功、`/Applications` 下却没有 app：Installer 的 bundle 重定位把包装到了
   系统里已存在的同名副本（CI 工作区里的构建产物）；`pkgbuild` 改用 component plist 关闭重定位，
   安装冒烟测试先断言 app 落在 `/Applications` 再执行
+- Release 的 Windows artifact 把 `setup.exe` 放进 `windows/` 子目录：`publish` 的 `sha256sum *`
+  会踩到目录直接失败，`gh release create release/*` 也只匹配一层、会静默漏发安装器；
+  上传前先平铺到 `dist/` 根，`publish` 再做一次防御性展平
 - `--interface` 纯数字只按网卡索引解释：此前 `-i 1` 会同时按 IPv4 前缀命中 `192.168.*` / `10.*` 等网卡，回环扫描实际扫了全网卡（Windows 真机测试发现）
 - GUI 表格「激活」列与详情「DHCP」行把不存在的 `tui.yes` / `tui.no` / `tui.none` 当成 key，界面上直接显示 key 原文；改用 `common.*`，并新增源码 key 扫描测试防止同类漏配
 - GUI 表格文字默认参与文本选择，点中 IP/型号等文字会吞掉点击，导致整行选中与双击 IP 只有空白处生效；表格区域关闭 `selectable_labels`，点击可穿透到整行

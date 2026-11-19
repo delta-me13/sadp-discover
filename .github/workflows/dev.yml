@@ -127,10 +127,16 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/smoke-install.ps1
 
+      # 与 release 同样的理由：upload-artifact 会保留相对路径，先把 setup.exe 挪到
+      # dist 根，artifact 里才是平铺的，下载后一眼能看全。
+      - name: Stage artifacts flat
+        shell: pwsh
+        run: Copy-Item -Path dist/windows/*.exe -Destination dist/
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-package
           path: |
             dist/*.zip
-            dist/windows/*.exe
+            dist/*.exe
           retention-days: 3

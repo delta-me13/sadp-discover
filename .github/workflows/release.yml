@@ -104,12 +104,19 @@ jobs:
         shell: pwsh
         run: ./scripts/windows/smoke-install.ps1
 
+      # upload-artifact 保留相对路径：dist/*.zip 与 dist/windows/*.exe 的公共前缀是
+      # dist，setup.exe 会落进 windows/ 子目录。publish 里的 sha256sum * 会因此踩到目录，
+      # gh release create release/* 也会漏掉安装器。先在 dist 根放一份，让 artifact 是平的。
+      - name: Stage artifacts flat
+        shell: pwsh
+        run: Copy-Item -Path dist/windows/*.exe -Destination dist/
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows
           path: |
             dist/*.zip
-            dist/windows/*.exe
+            dist/*.exe
             dist/SHA256SUMS-windows.txt
           if-no-files-found: error
 
@@ -293,6 +300,17 @@ jobs:
         with:
           path: release
           merge-multiple: true
+
+      # 防御性展平：artifact 沿用上传时的相对路径，历史上 windows 安装器曾在
+      # windows/ 子目录里。不展平的话 sha256sum * 会把目录当文件报错，
+      # 而 gh release create release/* 只匹配一层，安装器会被静默漏发。
+      - name: Flatten artifacts
+        run: |
+          set -euo pipefail
+          cd release
+          find . -mindepth 2 -type f -exec mv -t . {} +
+          find . -mindepth 1 -type d -empty -delete
+          ls -l
 
       # 两个构建 job 各自写过的 SHA256SUMS 会被 merge-multiple 覆盖掉一个，
       # 所以在这里按「最终的产物清单」重新算一遍，只留这一份。
