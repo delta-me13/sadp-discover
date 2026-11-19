@@ -21,9 +21,15 @@
 - 24h 连续性压测脚本（`.gate2/soak/`）：电源门禁、caffeinate、采样与自动裁决
 - `LICENSE-MIT` / `LICENSE-APACHE`、`CHANGELOG.md`、`deny.toml`（依赖许可 / 漏洞 / 来源审计）
 - CI：`macos-15` / `macos-latest`(26) 双版本矩阵，按 OS 只构建一次 release 产物，`cargo-deny` job
+- `release` 工作流支持 `workflow_dispatch` 试跑：用同一套 job 构建并上传 artifact，但绝不创建 Release；
+  没有签名证书时自动走「Windows 未签名 + macOS ad-hoc」，可在打 tag 前验证两条打包链路
+- 文档补齐「未签名产物」的用户预期与校验步骤：Windows SmartScreen、macOS Gatekeeper、
+  SHA-256 校验命令，以及接入证书后需要补的 `signtool` 步骤
 
 ### Fixed
 
+- Windows 安装器脚本顶部注释仍称「Inno 6.7+ 自带简体中文语言文件」，与实际实现（只用英文）矛盾；
+  语言说明的交叉引用也指错了章节
 - `--interface` 纯数字只按网卡索引解释：此前 `-i 1` 会同时按 IPv4 前缀命中 `192.168.*` / `10.*` 等网卡，回环扫描实际扫了全网卡（Windows 真机测试发现）
 - GUI 表格「激活」列与详情「DHCP」行把不存在的 `tui.yes` / `tui.no` / `tui.none` 当成 key，界面上直接显示 key 原文；改用 `common.*`，并新增源码 key 扫描测试防止同类漏配
 - GUI 表格文字默认参与文本选择，点中 IP/型号等文字会吞掉点击，导致整行选中与双击 IP 只有空白处生效；表格区域关闭 `selectable_labels`，点击可穿透到整行

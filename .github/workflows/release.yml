@@ -1,11 +1,28 @@
 name: release
 
-# 只认 tag：v0.1.0、v1.2.3-rc1（带连字符的自动按 prerelease 发布）。
+# 正式发布只认 tag：v0.1.0、v1.2.3-rc1（带连字符的自动按 prerelease 发布）。
 # 地址：把「能不能合并」（dev.yml）和「能不能发」彻底分开——
 # 这里才做 release 构建、签名、公证与打包。
+#
+# 另有 workflow_dispatch 试跑：用同一套 job 构建、上传 artifact，但绝不创建 Release。
+# 用途是在没有证书、也不想先打 tag 的情况下，验证两条打包链路（尤其是从未跑过的
+# macOS 通用二进制 → .app → .pkg → .dmg → 安装冒烟）。没有 secrets 时签名自动降级：
+# Windows 保持未签名、macOS 走 ad-hoc，这正是当前仓库的实际发布形态。
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "试跑版本号，必须与 Cargo.toml 一致（不带 v）"
+        required: true
+        default: "0.1.0"
+      dry_run:
+        description: "只构建并上传 artifact，不创建 GitHub Release"
+        type: boolean
+        default: true
+
+run-name: release ${{ inputs.version || github.ref_name }}${{ inputs.dry_run && ' (dry-run)' || '' }}
 
 permissions:
   contents: write
@@ -15,8 +32,9 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # 发布前的最后一道闸：tag 必须与 Cargo.toml 的版本一致，
+  # 发布前的最后一道闸：版本号必须与 Cargo.toml 一致，
   # 否则会出现「包叫 1.0.0、--version 却报 0.1.0」的发布事故。
+  # tag 触发时比对 tag；手动试跑时比对 input，绝不因为「试跑」而跳过闸门。
   version:
     name: version gate
     runs-on: ubuntu-latest
@@ -27,12 +45,22 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Check tag matches Cargo.toml
         id: check
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            raw="${INPUT_VERSION#"v"}"
+            label="input ${INPUT_VERSION}"
+          else
+            raw="${GITHUB_REF_NAME}"
+            label="tag ${GITHUB_REF_NAME}"
+          fi
+          tag="${raw#v}"
           manifest=$(cargo pkgid -p sadp-cli | sed -e 's/.*[#@]//')
           if [ "$tag" != "$manifest" ]; then
-            echo "::error::tag $GITHUB_REF_NAME 与 Cargo.toml 的 $manifest 不一致，先改版本号再打 tag"
+            echo "::error::${label} 与 Cargo.toml 的 $manifest 不一致，先改版本号再构建"
             exit 1
           fi
           echo "version=$tag" >> "$GITHUB_OUTPUT"
@@ -248,6 +276,8 @@ jobs:
     name: publish
     runs-on: ubuntu-latest
     needs: [version, windows, macos]
+    # 手动试跑永远不发布：构建与上传 artifact 已经完成，这里只负责「打 tag 才发」。
+    if: github.event_name == 'push'
     steps:
       - uses: actions/download-artifact@v4
         with:

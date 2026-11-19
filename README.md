@@ -73,7 +73,7 @@ CI 分成两条工作流，互不干扰：
 | 工作流 | 触发 | 做什么 |
 |---|---|---|
 | `dev` | push `main` / PR | `test`（fmt、clippy、Intel 交叉检查、单元测试）+ `e2e`（Windows 假设备）；push 到 `main` 时额外跑 `package`（Windows 打包 + 装/卸一遍），不产出对外发布的产物 |
-| `release` | **仅 `v*` tag** | 版本闸门 → cargo-deny → Windows `zip`+`setup.exe` / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release |
+| `release` | **仅 `v*` tag**；另可手动试跑 | 版本闸门 → cargo-deny → Windows `zip`+`setup.exe` / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release；试跑只构建并上传 artifact，不创建 Release |
 
 ```bash
 git tag v0.1.0 && git push origin v0.1.0
@@ -81,6 +81,16 @@ git tag v0.1.0 && git push origin v0.1.0
 
 tag 必须等于 `cargo pkgid -p sadp-cli` 的版本，否则 `release` 在版本闸门就失败；
 带连字符的 tag（`v1.2.3-rc1`）自动按 prerelease 发布。
+
+不想先打 tag、或还没有签名证书时，可以先手动试跑同一条流水线：
+
+```bash
+gh workflow run release.yml -f version=0.1.0 -f dry_run=true
+gh run watch
+```
+
+试跑同样过版本闸门（`version` 必须等于 workspace 版本），产物在 run 页面的 Artifacts 里，
+不会出现在 Releases；没有 secrets 时按「Windows 未签名 + macOS ad-hoc」构建。
 
 ## 安装与卸载
 
@@ -146,6 +156,26 @@ rm -rf ~/Library/Application\ Support/sadp-discover   # GUI 的日志目录
 macOS 15+ 的「本地网络」授权是记在系统设置里的，不随 app 删除而消失；
 要让新装的版本重新弹一次授权，去 **系统设置 → 隐私与安全性 → 本地网络** 里删掉
 `sadp-discover` 这一条。
+
+### 代码签名（当前未签名）
+
+仓库目前**没有** Windows Authenticode 证书，也没有 Apple Developer ID 证书，所以
+CI 产物是未签名的：Windows 会报 SmartScreen「未知发布者」，macOS 的 `.app` 只有
+ad-hoc 签名，Gatekeeper 会拦首次打开。**这是已知状态，不是包损坏。**
+
+- **Windows**：SmartScreen 弹窗 →「更多信息」→「仍要运行」；从 zip 解压的 exe 若被
+  标记为「来自 Internet」，可先 `Unblock-File .\<文件名>`。
+- **macOS**：右键点 `.app` →「打开」→ 再确认一次；被拦的 `.pkg` 去
+  「系统设置 → 隐私与安全性」点「仍要打开」。命令行可用
+  `xattr -dr com.apple.quarantine /Applications/sadp-discover.app` 清隔离属性。
+- **校验下载**：`Get-FileHash -Algorithm SHA256 <文件>`（Windows）或
+  `shasum -a 256 <文件>`（macOS），与 Release 里的 `SHA256SUMS*.txt` 对照。
+  ad-hoc 签名只保证包内自洽，**不证明发布者身份**，SHA-256 与 HTTPS 下载渠道才是
+  完整性依据。
+
+接入证书后流水线会在不改打包脚本的前提下自动签名/公证（secrets 名见
+[docs/MACOS-PACKAGING.md](docs/MACOS-PACKAGING.md) §8 与
+[docs/WINDOWS-PACKAGING.md](docs/WINDOWS-PACKAGING.md) §6）。
 
 ## 用法
 

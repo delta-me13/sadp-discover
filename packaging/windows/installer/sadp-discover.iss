@@ -1,4 +1,4 @@
-; sadp-discover 的 Windows 安装器（Inno Setup 6，6.7+ 自带简体中文语言文件）。
+; sadp-discover 的 Windows 安装器（Inno Setup 6）。
 ;
 ; 只做三件事：把两个 exe 放进用户目录、给 GUI 建快捷方式、把 CLI 加进 PATH。
 ; 装到 %LOCALAPPDATA%\Programs\sadp-discover，不需要管理员权限；
@@ -68,7 +68,7 @@ ShowLanguageDialog=auto
 
 [Languages]
 ; 只挂英文：Inno 6.7 的 Languages\ 目录里还没有 ChineseSimplified.isl
-; （社区翻译是 7.x 才并进主干的，见 §6 的说明）。
+; （社区翻译是 7.x 才并进主干的，见 docs/WINDOWS-PACKAGING.md §2）。
 ; 页面内容照旧是中文：安装前说明（readme.txt）与项目 README 都是中文。
 Name: "english"; MessagesFile: "compiler:Default.isl"
 

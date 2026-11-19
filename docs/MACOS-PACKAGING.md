@@ -293,6 +293,42 @@ shasum -a 256 dist/*.pkg dist/*.dmg dist/*.tar.gz > dist/SHA256SUMS
 
 tar.gz 也别漏了签名：`dist/bin/sadp-discover` 已经是签好的、lipo 后的产物，直接 `tar -czf` 即可（`COPYFILE_DISABLE=1` 防止 `._*` 混进去）。
 
+### 5.8 没有证书时产物是什么样
+
+未设置 `CODESIGN_IDENTITY` / `INSTALLER_IDENTITY` / `NOTARY_*` 时，脚本按下面的方式降级，
+**不会失败**（`release.yml` 里 macOS job 在没有 secrets 时走的就是这条路径）：
+
+| 步骤 | 无证书时的行为 |
+|---|---|
+| `sign.sh` | `CODESIGN_IDENTITY` 为空 → 打印「跳过签名」并退出 0；`bundle.sh` 默认 ad-hoc（`codesign --sign -`） |
+| `notarize.sh` | 没有 `NOTARY_PROFILE` 或 `ASC_KEY_*` → 跳过公证与 staple |
+| `pkg.sh` | 没有 `INSTALLER_IDENTITY` → 跳过 `productsign`，pkg 未签名 |
+| `dmg.sh` | 不对 dmg 本身签名 |
+
+用户侧表现与处理：
+
+- `.app` 首次打开被 Gatekeeper 拦：右键 →「打开」→ 再点「打开」；或
+  `xattr -dr com.apple.quarantine /Applications/sadp-discover.app`。
+- `.pkg` 双击提示「无法验证开发者」：**系统设置 → 隐私与安全性** →「仍要打开」；
+  或用 `sudo installer -pkg … -target /`（命令行不受 LaunchServices 拦截）。
+- `.dmg` 里的 app 与 `.app` 同样处理。
+
+校验下载完整性：
+
+```bash
+shasum -a 256 sadp-discover-<ver>-macos.pkg sadp-discover-<ver>-macos.dmg \
+  sadp-discover-<ver>-macos-universal.tar.gz
+# 与 Release 里的 SHA256SUMS.txt 对照
+```
+
+ad-hoc 签名只保证 bundle 内部自洽（修改任一文件都会破坏签名），**不证明发布者身份**，
+也没有可 staple 的离线票据。验收清单第 6/7 条（`spctl` accepted、断网启动）只有拿到
+Developer ID 证书、完成公证后才能通过。
+
+接入证书后无需改打包脚本：在仓库 secrets 里放 `MACOS_CERT_P12` / `MACOS_CERT_PASSWORD`
+与 `NOTARY_KEY_P8` / `NOTARY_KEY_ID` / `NOTARY_ISSUER`，`release.yml` 的 macOS job 会自动
+导入证书、签 Developer ID、公证、staple，并打开 `spctl` 校验。
+
 ## 6. 打包前必须先改的代码（否则包出来是坏的）
 
 这几条不属于「打包脚本」，但会直接决定包能不能用：

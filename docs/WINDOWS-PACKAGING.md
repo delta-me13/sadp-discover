@@ -107,6 +107,25 @@ GUI 用 `#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "w
 - **防火墙规则**：不做自动加规则——那需要管理员权限，与「按用户安装」冲突。
   首次运行时由系统弹窗询问，说明页里也写了手动补规则的命令。
 
+### 6.1 未签名安装器的用户预期
+
+没有 Authenticode 证书时，`setup.exe` 首次运行会弹 SmartScreen「Windows 已保护你的电脑」：
+点「更多信息」→「仍要运行」。从 zip 解压的 exe 可能带 Mark-of-the-Web，可先
+`Unblock-File .\sadp-discover-gui.exe`，之后再运行就不会再弹「打开文件 - 安全警告」。
+
+校验下载完整性：
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\sadp-discover-<ver>-windows-x86_64-setup.exe
+Get-FileHash -Algorithm SHA256 .\sadp-discover-<ver>-windows-x86_64.zip
+# 与 dist/SHA256SUMS-windows.txt（Release 里同名文件）逐行对照
+```
+
+这是**刻意的现状**，不是漏了一步：证书到位后，在 `installer.ps1` 编译完安装器之后加一段
+`signtool sign /fd SHA256 /tr <RFC3161 时间戳> /td SHA256`，再对 zip 里的两个 exe 各签一次
+即可；产物名、安装布局、PATH 行为都不变。届时 `Get-AuthenticodeSignature` 应返回
+`Status = Valid`，SmartScreen 的「未知发布者」才会消失。
+
 ## 7. CI 里验证了什么
 
 `dev` 工作流在 push 到 `main` 时跑 `package (windows)`（PR 不跑，省 runner 时间），
