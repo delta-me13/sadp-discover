@@ -30,6 +30,9 @@
 
 - Windows 安装器脚本顶部注释仍称「Inno 6.7+ 自带简体中文语言文件」，与实际实现（只用英文）矛盾；
   语言说明的交叉引用也指错了章节
+- macOS `.pkg` 安装报成功、`/Applications` 下却没有 app：Installer 的 bundle 重定位把包装到了
+  系统里已存在的同名副本（CI 工作区里的构建产物）；`pkgbuild` 改用 component plist 关闭重定位，
+  安装冒烟测试先断言 app 落在 `/Applications` 再执行
 - `--interface` 纯数字只按网卡索引解释：此前 `-i 1` 会同时按 IPv4 前缀命中 `192.168.*` / `10.*` 等网卡，回环扫描实际扫了全网卡（Windows 真机测试发现）
 - GUI 表格「激活」列与详情「DHCP」行把不存在的 `tui.yes` / `tui.no` / `tui.none` 当成 key，界面上直接显示 key 原文；改用 `common.*`，并新增源码 key 扫描测试防止同类漏配
 - GUI 表格文字默认参与文本选择，点中 IP/型号等文字会吞掉点击，导致整行选中与双击 IP 只有空白处生效；表格区域关闭 `selectable_labels`，点击可穿透到整行

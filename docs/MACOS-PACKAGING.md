@@ -234,8 +234,12 @@ rm -rf dist/pkgroot && mkdir -p dist/pkgroot/Applications dist/pkgroot/usr/local
 ditto --norsrc "$APP" dist/pkgroot/Applications/sadp-discover.app
 ditto --norsrc "$APP/Contents/MacOS/sadp-discover" dist/pkgroot/usr/local/bin/sadp-discover
 
-# ② component 包：只有 payload 与安装位置
-pkgbuild --root dist/pkgroot --identifier "${SADP_PKG_ID}.pkg" --version "$VERSION" \
+# ② 关掉 bundle 重定位，再打 component 包
+#    （否则同 bundle id 的旧副本会把「安装到 /Applications」劫持走，见下）
+pkgbuild --analyze --root dist/pkgroot "$work/component.plist"
+#    把每个条目的 BundleIsRelocatable 改成 false，脚本里用 python3 完成
+pkgbuild --root dist/pkgroot --component-plist "$work/component.plist" \
+  --identifier "${SADP_PKG_ID}.pkg" --version "$VERSION" \
   --ownership recommended --install-location / "$work/component.pkg"
 
 # ③ 套上安装向导：欢迎页 / 说明 / 许可协议 / 最低系统版本
@@ -255,6 +259,12 @@ component 包再包一层（`product archive`），产物因此是一层壳 + �
 - `Distribution.xml` 里的 product id 与 `pkg-ref` id 是两种身份：后者必须等于 `pkgbuild --identifier`，写错 `productbuild` 直接报错找不到组件包。
 - `<volume-check>` 的 `min="11.0"` 要与 `Info.plist` 的 `LSMinimumSystemVersion` 一起改，否则会出现「装得上、打不开」。
 - 注意 `--ownership recommended`，不要出现 root:wheel 以外莫名其妙的属主。
+- **必须关掉 bundle 重定位**（`BundleIsRelocatable=false`）：Installer 发现系统里已有同
+  `CFBundleIdentifier` 的 `.app`（下载目录里的旧版、CI 工作区里的构建产物都算）时，会把
+  包装到那个位置而不是 `/Applications`。症状是 installer 报「安装成功」、`/usr/local/bin`
+  的 CLI 也在，但 `/Applications` 下没有 app——2026-11-19 首次 release 试跑就是这样暴露的。
+  用 `pkgbuild --analyze` 生成 component plist 再改写即可；`release.yml` 的安装冒烟现在会
+  先断言 app 真的在 `/Applications`，失败时打印 `/Applications` 与 `pkgutil --pkgs`。
 - payload 里的 `._*` 是 `com.apple.provenance` 扩展属性被 pkgbuild 编码成 AppleDouble 的结果，内核对这个属性不允许删除（`xattr -d` 静默失败），属无损噪音。
 
 ### 5.6 公证 pkg + dmg

@@ -249,7 +249,17 @@ jobs:
       # （/Applications 下的 app、/usr/local/bin 下的 CLI 都能直接用）。
       - name: Install smoke test
         run: |
+          set -euo pipefail
           sudo installer -pkg dist/*.pkg -target /
+          # 先确认 app 真的落在 /Applications：Installer 的 bundle 重定位会让
+          # 「安装成功」和「/Applications 下没有 app」同时成立，不显式断言就会被
+          # 下一行一句 No such file or directory 带偏。
+          if [ ! -d /Applications/sadp-discover.app ]; then
+            echo "::error::安装报成功，但 /Applications 下没有 sadp-discover.app（检查 pkg 的 BundleIsRelocatable）"
+            ls -la /Applications | head -40
+            pkgutil --pkgs | grep -i sadp || true
+            exit 1
+          fi
           /usr/local/bin/sadp-discover --version
           /Applications/sadp-discover.app/Contents/MacOS/sadp-discover-gui --version
           which sadp-discover

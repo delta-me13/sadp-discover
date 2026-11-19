@@ -41,12 +41,33 @@ xattr -cr "$root" 2>/dev/null || true
 
 sadp_require_cmd pkgbuild
 sadp_require_cmd productbuild
+sadp_require_cmd python3
 work=$(mktemp -d "${TMPDIR:-/tmp}/sadp-pkg.XXXXXX")
 trap 'rm -rf "$work"' EXIT
+
+# Installer 默认允许「bundle 重定位」：系统里若已存在同 CFBundleIdentifier 的 .app
+# （用户下载目录里的旧版本、CI 工作区里的构建产物都算），它会把包装到那个位置，而不是
+# /Applications。表现极具迷惑性——installer 报「安装成功」，/usr/local/bin 的 CLI 也在，
+# 但 /Applications 下根本没有 app（2026-11-19 首次 release 试跑就踩到了）。
+# 用 pkgbuild --analyze 生成 component plist，把所有 bundle 标成不可重定位，路径才确定。
+component_plist="$work/component.plist"
+pkgbuild --analyze --root "$root" "$component_plist"
+python3 - "$component_plist" <<'PY'
+import plistlib, sys
+
+path = sys.argv[1]
+with open(path, "rb") as fh:
+    entries = plistlib.load(fh)
+for entry in entries:
+    entry["BundleIsRelocatable"] = False
+with open(path, "wb") as fh:
+    plistlib.dump(entries, fh)
+PY
 
 component="sadp-discover-${SADP_VERSION}-component.pkg"
 sadp_note "pkgbuild -> ${component}"
 pkgbuild --root "$root" \
+  --component-plist "$component_plist" \
   --identifier "${SADP_PKG_ID}.pkg" \
   --version "${SADP_VERSION}" \
   --ownership recommended \
