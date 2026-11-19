@@ -312,6 +312,21 @@ jobs:
           find . -mindepth 1 -type d -empty -delete
           ls -l
 
+      # 五个交付物一个都不能少：少了 pkg/dmg/zip/setup 里任何一个，Release 都是残缺的，
+      # 而 gh release create 的 glob 不会因为少一个文件而报错。
+      - name: Verify asset set
+        run: |
+          set -euo pipefail
+          cd release
+          for pattern in '*-macos.pkg' '*-macos.dmg' '*-macos-universal.tar.gz' \
+                         '*-windows-x86_64.zip' '*-windows-x86_64-setup.exe'; do
+            found=$(compgen -G "$pattern" || true)
+            if [ -z "$found" ]; then
+              echo "::error::缺少产物 ${pattern}"
+              exit 1
+            fi
+          done
+
       # 两个构建 job 各自写过的 SHA256SUMS 会被 merge-multiple 覆盖掉一个，
       # 所以在这里按「最终的产物清单」重新算一遍，只留这一份。
       - name: Regenerate checksums
