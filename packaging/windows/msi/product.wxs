@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  sadp-discover 的 MSI（WiX Toolset 3.14）。
+
+  定位：给企业批量部署（GPO / Intune / SCCM）用的静默安装包。与 Inno 安装器二选一，
+  不要在同一台机器上同时装：两者写同一个目录、同一条用户 PATH、同一个开始菜单项，
+  卸载其中一个会把另一个的入口拆掉。
+
+  按用户安装（InstallScope=perUser）：装到 %LOCALAPPDATA%\Programs\sadp-discover，
+  不弹 UAC；PATH 写 HKCU\Environment；开始菜单进当前用户。与 Inno 安装器的布局一致。
+
+  参数（由 scripts/windows/msi.ps1 传）：
+    Version   0.1.0
+    Platform  x64 | arm64
+    Payload   dist\windows\payload(-arm64) 的绝对路径
+    RepoRoot  仓库根（图标用）
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <Product Id="*"
+           Name="sadp-discover"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="delta-me13"
+           UpgradeCode="18257F6B-CC5B-4CD2-A6BB-8574D4A0FBE3"
+           Codepage="936">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perUser"
+             Platform="$(var.Platform)" />
+
+    <!-- 同版本重装也允许：CI 冒烟会反复装同一个包。 -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="已安装更新的 sadp-discover，请先卸载再装这个版本。" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="ProductIcon" SourceFile="$(var.RepoRoot)\assets\sadp-discover.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/delta-me13/sadp-discover" />
+    <Property Id="ARPSIZE" Value="20" />
+
+    <!-- 目录布局与 Inno 安装器完全一致：%LOCALAPPDATA%\Programs\sadp-discover -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ProgramsFolder" Name="Programs">
+          <Directory Id="INSTALLFOLDER" Name="sadp-discover" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder" />
+    </Directory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="MainBinaries" Guid="0A9A77AC-8D40-4F69-8453-8EB2E13C1939">
+        <!-- 按用户安装：组件的 KeyPath 必须是 HKCU 下的注册表值，不能是文件（ICE38）。 -->
+        <RegistryValue Root="HKCU" Key="Software\sadp-discover" Name="Binaries" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="CliExe" Source="$(var.Payload)\sadp-discover.exe" />
+        <File Id="GuiExe" Source="$(var.Payload)\sadp-discover-gui.exe" />
+        <File Id="Readme" Source="$(var.Payload)\README.md" />
+        <File Id="LicenseMit" Source="$(var.Payload)\LICENSE-MIT" />
+        <File Id="LicenseApache" Source="$(var.Payload)\LICENSE-APACHE" />
+        <!-- 用户目录下的文件夹不写 RemoveFile 会残留（ICE64）；空的才会被删掉。 -->
+        <RemoveFolder Id="RemoveINSTALLFOLDER" Directory="INSTALLFOLDER" On="uninstall" />
+        <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
+      </Component>
+
+      <!-- PATH 追加 / 卸载时摘除。Environment 本身不能当 KeyPath，配一个 HKCU 值。 -->
+      <Component Id="PathEnvironment" Guid="1B1CF8FD-CF17-4A4A-B45E-38FD11D7865D">
+        <Environment Id="PathEntry"
+                     Name="PATH"
+                     Value="[INSTALLFOLDER]"
+                     Permanent="no"
+                     Part="last"
+                     Action="set"
+                     System="no" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\sadp-discover"
+                       Name="PathEntry"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- 快捷方式直接放在「开始菜单\程序」根下，与 Inno 安装器一致；
+         不要建子目录，卸载时也不需要 RemoveFolder（快捷方式随组件删除）。 -->
+    <DirectoryRef Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="87D092EC-1F5D-411B-A7A5-B99BA8A6A9AC">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="sadp-discover"
+                  Target="[INSTALLFOLDER]sadp-discover-gui.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Advertise="no" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\sadp-discover"
+                       Name="StartMenuShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainFeature" Title="sadp-discover" Level="1">
+      <ComponentRef Id="MainBinaries" />
+      <ComponentRef Id="PathEnvironment" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+  </Product>
+</Wix>

@@ -123,15 +123,21 @@ jobs:
             exit 1
           }
 
-      - name: Install smoke test
+      - name: Install smoke test (Inno)
         shell: pwsh
         run: ./scripts/windows/smoke-install.ps1
 
-      # 与 release 同样的理由：upload-artifact 会保留相对路径，先把 setup.exe 挪到
-      # dist 根，artifact 里才是平铺的，下载后一眼能看全。
+      - name: Install smoke test (MSI)
+        shell: pwsh
+        run: ./scripts/windows/smoke-msi.ps1
+
+      # 与 release 同样的理由：upload-artifact 会保留相对路径，先把 setup.exe / msi
+      # 挪到 dist 根，artifact 里才是平铺的，下载后一眼能看全。
       - name: Stage artifacts flat
         shell: pwsh
-        run: Copy-Item -Path dist/windows/*.exe -Destination dist/
+        run: |
+          Copy-Item -Path dist/windows/*.exe -Destination dist/
+          Copy-Item -Path dist/windows/*.msi -Destination dist/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -139,4 +145,62 @@ jobs:
           path: |
             dist/*.zip
             dist/*.exe
+            dist/*.msi
+            dist/SHA256SUMS-windows*.txt
+          retention-days: 3
+
+  # ARM64：在 x64 runner 上交叉编译（VS 镜像自带 ARM64 C++ 工具链）。
+  # 不跑安装冒烟：x64 主机执行不了 ARM64 的 exe；架构由 build.ps1 读 PE 头断言。
+  package-windows-arm64:
+    name: package (windows arm64)
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build ARM64 (cross)
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'build-windows-arm64.log'
+          $code = 0
+          try {
+            & ./scripts/build-windows.ps1 -Arch arm64 *> $log
+            $code = $LASTEXITCODE
+          } catch {
+            $code = 1
+            Add-Content -Path $log -Value ($_ | Out-String)
+          }
+          Get-Content -Path $log -Tail 40 | Write-Host
+          if ($code -ne 0) {
+            $text = (Get-Content -Path $log -Raw)
+            $tail = $text.Substring([Math]::Max(0, $text.Length - 3000)) -replace '\r?\n', '%0A'
+            Write-Host "::error title=windows-arm64-build::$tail"
+            exit 1
+          }
+
+      - name: Stage artifacts flat
+        shell: pwsh
+        run: |
+          Copy-Item -Path dist/windows/*.exe -Destination dist/
+          Copy-Item -Path dist/windows/*.msi -Destination dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm64-package
+          path: |
+            dist/*windows-arm64.zip
+            dist/*windows-arm64-setup.exe
+            dist/*windows-arm64.msi
+            dist/SHA256SUMS-windows-arm64.txt
+          if-no-files-found: error
           retention-days: 3

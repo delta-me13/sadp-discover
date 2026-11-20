@@ -16,6 +16,15 @@
 #ifndef OutputBaseFilename
   #define OutputBaseFilename "sadp-discover-setup"
 #endif
+; x64 用 x64compatible（ARM64 Windows 上也能装 x64 仿真包）；
+; arm64 包传 arm64，安装器会拒绝在 x64 上运行。
+#ifndef ArchAllowed
+  #define ArchAllowed "x64compatible"
+#endif
+; payload 目录名：x64 是 payload，arm64 是 payload-arm64（两个架构共用 dist\windows）。
+#ifndef PayloadDir
+  #define PayloadDir "payload"
+#endif
 
 #define AppName "sadp-discover"
 #define AppPublisher "delta-me13"
@@ -46,12 +55,12 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 MinVersion=10.0
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed={#ArchAllowed}
+ArchitecturesInstallIn64BitMode={#ArchAllowed}
 
 OutputDir={#RepoRoot}\dist\windows
 OutputBaseFilename={#OutputBaseFilename}
-SourceDir={#RepoRoot}\dist\windows\payload
+SourceDir={#RepoRoot}\dist\windows\{#PayloadDir}
 SetupIconFile={#RepoRoot}\assets\sadp-discover.ico
 UninstallDisplayIcon={app}\{#AppExe}
 
@@ -67,14 +76,18 @@ ChangesEnvironment=yes
 ShowLanguageDialog=auto
 
 [Languages]
-; 只挂英文：Inno 6.7 的 Languages\ 目录里还没有 ChineseSimplified.isl
-; （社区翻译是 7.x 才并进主干的，见 docs/WINDOWS-PACKAGING.md §2）。
-; 页面内容照旧是中文：安装前说明（readme.txt）与项目 README 都是中文。
+; 中文语言文件随仓库走（packaging/windows/installer/languages/），
+; 因为 Inno 6.7 的安装目录里没有 ChineseSimplified.isl——简体中文 7.x 才进主干。
+; 文件取自 issrc 的 is-6_7_4 标签（Unofficial 目录），与 6.7 的消息集对齐。
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesesimplified"; MessagesFile: "{#RepoRoot}\packaging\windows\installer\languages\ChineseSimplified.isl"
 
 [CustomMessages]
+; 这些文案会出现在任务页，中英各一份，别只改英文。
 AddToPath=Add sadp-discover to PATH
 ModifyEnvironment=Environment
+chinesesimplified.AddToPath=将 sadp-discover 加入 PATH
+chinesesimplified.ModifyEnvironment=环境变量
 
 [Tasks]
 Name: "addtopath"; Description: "{cm:AddToPath}"; GroupDescription: "{cm:ModifyEnvironment}"

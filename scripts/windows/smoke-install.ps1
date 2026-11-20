@@ -1,18 +1,23 @@
-# 装一遍、跑一遍、卸一遍。
+# 装一遍、跑一遍、卸一遍（Inno 安装器）。
 #
 # 这是唯一能验证「安装器布局真的对」的步骤：文件落在哪、快捷方式有没有、
 # PATH 有没有加上、卸载后有没有留垃圾。release 与 dev 都用它做冒烟。
+#
+# 只能在「主机架构 == 包架构」时跑：x64 主机跑不了 ARM64 的 exe。
 
 [CmdletBinding()]
-param([string]$InstallDir)
+param(
+    [string]$InstallDir,
+    [ValidateSet('x64', 'arm64')][string]$Arch = 'x64'
+)
 
 . (Join-Path $PSScriptRoot 'config.ps1')
-$cfg = Get-SadpConfig
+$cfg = Get-SadpConfig -Arch $Arch
 
 if (-not $InstallDir) {
     $InstallDir = Join-Path $env:TEMP "sadp-discover-smoke-$(Get-Random)"
 }
-if (-not (Test-Path $cfg.Setup)) { throw "缺少 $($cfg.Setup)（先跑 scripts/windows/installer.ps1）" }
+if (-not (Test-Path $cfg.Setup)) { throw "缺少 $($cfg.Setup)（先跑 scripts/windows/installer.ps1 -Arch $Arch）" }
 
 $cli = Join-Path $InstallDir 'sadp-discover.exe'
 $gui = Join-Path $InstallDir 'sadp-discover-gui.exe'
@@ -26,7 +31,10 @@ function Get-UserPath {
 function Test-PathListed([string]$Value) {
     $paths = Get-UserPath
     if ([string]::IsNullOrEmpty($paths)) { return $false }
-    return @($paths.Split(';') | Where-Object { $_ -eq $Value }).Count -gt 0
+    # MSI 的 Environment 表把目录属性格式化成带尾反斜杠的路径，Inno 不带；
+    # 比较前统一去掉，避免因为一个 `\` 误判。
+    $wanted = $Value.TrimEnd('\')
+    return @($paths.Split(';') | Where-Object { $_.TrimEnd('\') -eq $wanted }).Count -gt 0
 }
 
 Write-Step "静默安装到 $InstallDir"

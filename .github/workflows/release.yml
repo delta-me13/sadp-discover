@@ -84,6 +84,9 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # ARM64 在 x64 runner 上交叉编译；windows-latest 镜像自带 ARM64 C++ 工具链。
+          targets: aarch64-pc-windows-msvc
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
@@ -93,23 +96,34 @@ jobs:
           # cache-on-failure 只保证「同一 tag 重跑」能命中。
           cache-on-failure: true
 
-      # 构建 → 便携 zip → Inno Setup 安装器 → 校验和，全在脚本里，
+      # 构建 → 便携 zip → Inno Setup 安装器 → MSI → 校验和，全在脚本里，
       # 与 dev 的打包自检跑的是同一份代码（这里只多一个 tag 版本闸门）。
-      - name: Build, package, installer
+      - name: Build x64, package, installer, MSI
         shell: pwsh
-        run: ./scripts/build-windows.ps1
+        run: ./scripts/build-windows.ps1 -Arch x64
 
       # 装到一个临时目录、跑两个 exe、再静默卸载：只有这一步能证明安装器布局是对的。
-      - name: Install smoke test
+      - name: Install smoke test (Inno, x64)
         shell: pwsh
-        run: ./scripts/windows/smoke-install.ps1
+        run: ./scripts/windows/smoke-install.ps1 -Arch x64
+
+      - name: Install smoke test (MSI, x64)
+        shell: pwsh
+        run: ./scripts/windows/smoke-msi.ps1 -Arch x64
+
+      # ARM64 交叉编译：x64 主机执行不了产物，架构由 build.ps1 读 PE 头断言。
+      - name: Build ARM64 (cross), package, installer, MSI
+        shell: pwsh
+        run: ./scripts/build-windows.ps1 -Arch arm64
 
       # upload-artifact 保留相对路径：dist/*.zip 与 dist/windows/*.exe 的公共前缀是
-      # dist，setup.exe 会落进 windows/ 子目录。publish 里的 sha256sum * 会因此踩到目录，
-      # gh release create release/* 也会漏掉安装器。先在 dist 根放一份，让 artifact 是平的。
+      # dist，setup.exe / msi 会落进 windows/ 子目录。publish 里的 sha256sum * 会因此
+      # 踩到目录，gh release create release/* 也会漏掉安装器。先在 dist 根放一份。
       - name: Stage artifacts flat
         shell: pwsh
-        run: Copy-Item -Path dist/windows/*.exe -Destination dist/
+        run: |
+          Copy-Item -Path dist/windows/*.exe -Destination dist/
+          Copy-Item -Path dist/windows/*.msi -Destination dist/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -117,7 +131,8 @@ jobs:
           path: |
             dist/*.zip
             dist/*.exe
-            dist/SHA256SUMS-windows.txt
+            dist/*.msi
+            dist/SHA256SUMS-windows*.txt
           if-no-files-found: error
 
   macos:
@@ -319,7 +334,8 @@ jobs:
           set -euo pipefail
           cd release
           for pattern in '*-macos.pkg' '*-macos.dmg' '*-macos-universal.tar.gz' \
-                         '*-windows-x86_64.zip' '*-windows-x86_64-setup.exe'; do
+                         '*-windows-x86_64.zip' '*-windows-x86_64-setup.exe' '*-windows-x86_64.msi' \
+                         '*-windows-arm64.zip' '*-windows-arm64-setup.exe' '*-windows-arm64.msi'; do
             found=$(compgen -G "$pattern" || true)
             if [ -z "$found" ]; then
               echo "::error::缺少产物 ${pattern}"
