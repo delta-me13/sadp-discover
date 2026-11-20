@@ -74,7 +74,7 @@ PATH 的增删写在 `[Code]` 里而不是 `[Registry]`：`[Registry]` 在卸载
 |---|---|
 | 文件 | `%ProgramFiles%\sadp-discover`（`ProgramFiles64Folder`） |
 | PATH | `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment` 的 `Path` |
-| 快捷方式 | 公共开始菜单 `sadp-discover.lnk`（`CommonProgramsFolder`） |
+| 快捷方式 | 公共开始菜单 `sadp-discover.lnk`（`ProgramMenuFolder`，`ALLUSERS=1` 时解析到所有用户） |
 | 卸载信息 | `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\...` |
 | 权限 | `InstallScope="perMachine"` + `InstallPrivileges="elevated"`，安装/卸载要管理员 |
 
@@ -90,8 +90,10 @@ profile；企业批量部署需要机器级落点。个人用户走 Inno 安装�
 几个踩过的坑，改 wxs 时别退回去：
 
 - **组件不能用文件当 KeyPath**（ICE38），挂一个 HKLM 注册表值。
-- **按机器安装必须用 `CommonProgramsFolder`**，不能用 `ProgramMenuFolder`：后者按用户
-  解析，配 HKLM KeyPath 会连报 ICE38 / ICE43 / ICE57。
+- **快捷方式用 `ProgramMenuFolder`**：`ALLUSERS=1` 时 Windows Installer 把它解析到所有
+  用户的「开始菜单\程序」；`CommonProgramsFolder` 不是标准文件夹属性，写它会解析不到、
+  快捷方式静默不创建（CI 冒烟实测）。ICE38 / ICE43 / ICE57 是静态判断、看不到 ALLUSERS，
+  `msi.ps1` 只抑制这三条并在注释里说明理由。
 - **`InstallScope="perMachine"` + `InstallPrivileges="elevated"`**：light 会写入 `ALLUSERS=1`；
   不写就退化成按用户，ARP 与 PATH 全跑偏。
 - **`Codepage="936"`**：`DowngradeErrorMessage` 是中文，默认 1252 会让 light 直接报 LGHT0311。
