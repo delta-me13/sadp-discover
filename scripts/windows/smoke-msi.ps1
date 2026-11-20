@@ -73,7 +73,16 @@ Invoke-SadpVersionProbe $cli
 Invoke-SadpVersionProbe $gui
 
 $startMenu = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'sadp-discover.lnk'
-if (-not (Test-Path $startMenu)) { throw "没有创建开始菜单快捷方式：$startMenu" }
+if (-not (Test-Path $startMenu)) {
+    # 把两处开始菜单的实际内容打出来：perMachine 用 CommonPrograms，perUser 用 Programs，
+    # 分不清时至少能看到快捷方式到底落在哪。
+    foreach ($root in @([Environment]::GetFolderPath('CommonPrograms'), [Environment]::GetFolderPath('Programs'))) {
+        Write-Host "开始菜单 $root"
+        Get-ChildItem $root -Recurse -Filter '*sadp*' -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "    $($_.FullName)" }
+    }
+    throw "没有创建开始菜单快捷方式：$startMenu"
+}
 if (-not (Test-PathListed $InstallDir)) { throw "系统 PATH 里没有 $InstallDir（HKLM\...\Environment）" }
 
 $code = Find-ProductCode
