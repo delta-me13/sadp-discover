@@ -17,7 +17,8 @@
 - ✅ **CLI / TUI**：双栈发现、跨栈去重、JSON·CSV、中英双语、日志落盘
 - ✅ **macOS**：Gate 2 清单 11/12（24h 连续性待跑），通用二进制脚本
 - ✅ **GUI**：`sadp-discover-gui`，表格 / 详情 / 过滤 / 排序 / 复制 / 语言切换 / 日志目录；设置面板可多选网卡、地址族、窗口/周期/端口；导出走系统「另存为」，深/浅主题可切换；整行单击看详情，双击 IP 开设备 Web 后台
-- ✅ **CI**：`dev`（test + e2e + Windows 打包自检）与 `release`（仅 `v*` tag：版本闸门 → Windows `zip`+`setup.exe` / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release）
+- ✅ **Windows 分发**：Inno 安装器（中英双语向导）、MSI（GPO/Intune 静默部署）、便携 zip；x64 与 ARM64（x64 主机交叉编译）各一份
+- ✅ **CI**：`dev`（test + e2e + Windows x64/ARM64 打包自检 + 两种安装器的装/卸冒烟）与 `release`（仅 `v*` tag：版本闸门 → Windows `zip`+`setup.exe`+`MSI`（x64/ARM64） / macOS universal `.app`+`.pkg`+`.dmg`+`tar.gz` → GitHub Release）
 - 🟡 **真机（Windows）**：Win11 + 球机 DS-2DE4423DW-D/GLT/XM 已通过默认发现、多网卡/VPN 隔离、端口占用回退与双语检查；IPC/NVR、Win10 与防火墙待补，详见 [.gate1/gate1-report.md](.gate1/gate1-report.md)
 - ⏳ **待硬件**：IPC/NVR 真机、Win10 主机、IPv6 双栈真机；IPv6 组播地址抓包确认
 
@@ -35,11 +36,20 @@
 cargo build --release -p sadp-cli
 # 产物：target/release/sadp-discover.exe
 
-# Windows 分发包（便携 zip + Inno Setup 安装器，需在 Windows 上运行）
+# Windows 分发包（zip + Inno 安装器 + MSI，需在 Windows 上运行）
+# 依赖：Inno Setup 6（中文向导用仓库自带的 languages\ChineseSimplified.isl）、
+#       WiX Toolset 3.14（MSI）；GitHub 的 windows-latest 镜像两者都预装。
 pwsh -File scripts/build-windows.ps1
 # 产物：dist/sadp-discover-<version>-windows-x86_64.zip
 #       dist/windows/sadp-discover-<version>-windows-x86_64-setup.exe
-# 只要 zip、不装 Inno Setup：pwsh -File scripts/build-windows.ps1 -SkipInstaller
+#       dist/windows/sadp-discover-<version>-windows-x86_64.msi
+# 只要 zip：pwsh -File scripts/build-windows.ps1 -SkipInstaller -SkipMsi
+
+# Windows ARM64（在 x64 主机上交叉编译）
+# 需要 VS 组件 Microsoft.VisualStudio.Component.VC.Tools.ARM64；
+# 没有该组件时可设 SADP_XWIN_SPLAT 指向 xwin splat 目录（见 docs/WINDOWS-PACKAGING.md）。
+pwsh -File scripts/build-windows.ps1 -Arch arm64
+# 产物后缀换成 -windows-arm64（zip / setup.exe / msi 各一份）
 
 # macOS 通用二进制（arm64 + x86_64，需在 Mac 上运行）
 bash scripts/build-macos-universal.sh
@@ -98,18 +108,27 @@ gh run watch
 
 | 产物 | 装什么 | 适合 |
 |---|---|---|
-| `…-setup.exe` | `%LOCALAPPDATA%\Programs\sadp-discover` 下的两个 exe，开始菜单快捷方式，CLI 加进用户 PATH | **推荐**：不需要管理员权限，卸载走「设置 → 应用」 |
+| `…-setup.exe` | `%LOCALAPPDATA%\Programs\sadp-discover` 下的两个 exe，开始菜单快捷方式，CLI 加进用户 PATH；向导为中英双语 | **推荐**：不需要管理员权限，卸载走「设置 → 应用」 |
+| `…-windows-x86_64.msi` | 同样的文件与 PATH 行为，走 Windows Installer | 企业批量部署（GPO / Intune / SCCM），可 `/qn` 静默 |
 | `…-windows-x86_64.zip` | 同样这几个文件，解压即用 | 便携、免安装、丢进 U 盘 |
+| `…-windows-arm64.zip` / `-arm64-setup.exe` / `-arm64.msi` | 同上，ARM64 原生 | Windows on ARM（x64 仿真包也能跑，但原生更快） |
 
 ```powershell
 # 安装器：默认就装到当前用户，不弹 UAC；/VERYSILENT 用于脚本与批量部署
 .\sadp-discover-<version>-windows-x86_64-setup.exe
 .\sadp-discover-<version>-windows-x86_64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES
 
+# MSI：按用户静默安装 / 卸载（企业部署用；不要与 setup.exe 同时装）
+msiexec /i .\sadp-discover-<version>-windows-x86_64.msi /qn
+msiexec /x .\sadp-discover-<version>-windows-x86_64.msi /qn
+
 # 便携包
 Expand-Archive sadp-discover-<version>-windows-x86_64.zip -DestinationPath .
 .\sadp-discover-<version>-windows-x86_64\sadp-discover-gui.exe
 ```
+
+> **二选一**：Inno 安装器与 MSI 写同一个安装目录、同一条用户 PATH、同一个开始菜单项，
+> 同一台机器上只装一种。ARM64 包只能装在 ARM64 Windows 上。
 
 装完**新开一个命令行窗口**才看得到 PATH 里的 `sadp-discover`。首次扫描时 Windows
 防火墙会问是否允许访问网络，请勾选「专用网络」并允许——拒绝之后设备回包会被丢掉，

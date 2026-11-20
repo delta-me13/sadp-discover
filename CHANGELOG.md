@@ -25,6 +25,13 @@
   没有签名证书时自动走「Windows 未签名 + macOS ad-hoc」，可在打 tag 前验证两条打包链路
 - 文档补齐「未签名产物」的用户预期与校验步骤：Windows SmartScreen、macOS Gatekeeper、
   SHA-256 校验命令，以及接入证书后需要补的 `signtool` 步骤
+- Windows MSI：WiX 3.14 的按用户安装包（`%LOCALAPPDATA%\Programs\sadp-discover`、HKCU PATH、
+  开始菜单项），供 GPO / Intune / SCCM 静默部署；`dev` 与 `release` 都跑 `msiexec` 装/卸冒烟
+- Windows 安装向导中英双语：随仓库携带 issrc `is-6_7_4` 的 `ChineseSimplified.isl`
+  （Inno 6.7 自带目录没有简体中文），`[Languages]` 挂中英两份，任务文案也都有中文
+- Windows ARM64：`scripts/build-windows.ps1 -Arch arm64` 在 x64 上交叉编译，
+  产出 `-windows-arm64` 的 zip / `setup.exe` / MSI；`build.ps1` 读 PE 头断言架构，
+  `dev` 与 `release` 都增加 ARM64 打包任务
 
 ### Fixed
 
@@ -36,6 +43,11 @@
 - Release 的 Windows artifact 把 `setup.exe` 放进 `windows/` 子目录：`publish` 的 `sha256sum *`
   会踩到目录直接失败，`gh release create release/*` 也只匹配一层、会静默漏发安装器；
   上传前先平铺到 `dist/` 根，`publish` 再做一次防御性展平
+- MSI 的几个布局问题：按用户组件不能用文件当 KeyPath（ICE38）、用户目录要写 RemoveFolder
+  （ICE64）、中文错误文案需要 `Codepage=936`（否则 LGHT0311）；PATH 值带尾反斜杠的差异
+  在冒烟里统一归一化
+- ARM64 交叉编译不再依赖 `vcvarsall.bat`（受限会话里 `cmd.exe` 直接 `ERROR_ELEVATION_REQUIRED`），
+  改为自己拼 PATH / LIB / INCLUDE，并支持 `SADP_XWIN_SPLAT` 作为无 VS ARM64 组件时的退路
 - `--interface` 纯数字只按网卡索引解释：此前 `-i 1` 会同时按 IPv4 前缀命中 `192.168.*` / `10.*` 等网卡，回环扫描实际扫了全网卡（Windows 真机测试发现）
 - GUI 表格「激活」列与详情「DHCP」行把不存在的 `tui.yes` / `tui.no` / `tui.none` 当成 key，界面上直接显示 key 原文；改用 `common.*`，并新增源码 key 扫描测试防止同类漏配
 - GUI 表格文字默认参与文本选择，点中 IP/型号等文字会吞掉点击，导致整行选中与双击 IP 只有空白处生效；表格区域关闭 `selectable_labels`，点击可穿透到整行
