@@ -1,7 +1,9 @@
 # 装一遍、跑一遍、卸一遍（MSI）。
 #
-# 与 smoke-install.ps1 覆盖同样的断言，只是走 msiexec。只能在主机架构 == 包架构时跑。
-# 注意：MSI 与 Inno 安装器二选一，冒烟前确保机器上没有另一份安装。
+# 与 smoke-install.ps1 覆盖同样的断言，只是走 msiexec。只能在主机架构 == 包架构时跑，
+# 且必须**管理员**会话：MSI 是 perMachine（Program Files + HKLM PATH）。
+# 注意：MSI 与 Inno 安装器可以共存（不同目录、不同 PATH 作用域），但开始菜单项同名，
+# 冒烟前确保机器上没有另一份安装，免得卸载断言误判。
 
 [CmdletBinding()]
 param([ValidateSet('x64', 'arm64')][string]$Arch = 'x64')
@@ -11,22 +13,26 @@ $cfg = Get-SadpConfig -Arch $Arch
 
 if (-not (Test-Path $cfg.Msi)) { throw "缺少 $($cfg.Msi)（先跑 scripts/windows/msi.ps1 -Arch $Arch）" }
 
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) { throw 'MSI 冒烟需要管理员会话（perMachine：Program Files + HKLM PATH）' }
+
 # 必须装到默认目录：MSI 的 INSTALLFOLDER 覆盖值不会在卸载时保留下来，
 # 用自定义目录会「装到 A、卸的时候去删 B」，文件与 PATH 都会残留。
-$InstallDir = Join-Path $env:LOCALAPPDATA 'Programs/sadp-discover'
+$InstallDir = Join-Path $env:ProgramFiles 'sadp-discover'
 if (Test-Path $InstallDir) { throw "默认安装目录已存在，先手工清理：$InstallDir" }
 
 $cli = Join-Path $InstallDir 'sadp-discover.exe'
 $gui = Join-Path $InstallDir 'sadp-discover-gui.exe'
 
-function Get-UserPath {
-    $item = Get-ItemProperty -Path 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue
+function Get-SystemPath {
+    $item = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment' -Name Path -ErrorAction SilentlyContinue
     if ($null -eq $item) { return '' }
     return [string]$item.Path
 }
 
 function Test-PathListed([string]$Value) {
-    $paths = Get-UserPath
+    $paths = Get-SystemPath
     if ([string]::IsNullOrEmpty($paths)) { return $false }
     # MSI 的 Environment 表把目录属性格式化成带尾反斜杠的路径，Inno 不带；
     # 比较前统一去掉，避免因为一个 `\` 误判。
@@ -66,9 +72,9 @@ foreach ($file in @($cli, $gui)) {
 Invoke-SadpVersionProbe $cli
 Invoke-SadpVersionProbe $gui
 
-$startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'sadp-discover.lnk'
+$startMenu = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'sadp-discover.lnk'
 if (-not (Test-Path $startMenu)) { throw "没有创建开始菜单快捷方式：$startMenu" }
-if (-not (Test-PathListed $InstallDir)) { throw "PATH 里没有 $InstallDir（HKCU\Environment）" }
+if (-not (Test-PathListed $InstallDir)) { throw "系统 PATH 里没有 $InstallDir（HKLM\...\Environment）" }
 
 $code = Find-ProductCode
 if (-not $code) { throw '在卸载注册表里找不到 sadp-discover 的 ProductCode' }

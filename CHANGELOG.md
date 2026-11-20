@@ -25,8 +25,8 @@
   没有签名证书时自动走「Windows 未签名 + macOS ad-hoc」，可在打 tag 前验证两条打包链路
 - 文档补齐「未签名产物」的用户预期与校验步骤：Windows SmartScreen、macOS Gatekeeper、
   SHA-256 校验命令，以及接入证书后需要补的 `signtool` 步骤
-- Windows MSI：WiX 3.14 的按用户安装包（`%LOCALAPPDATA%\Programs\sadp-discover`、HKCU PATH、
-  开始菜单项），供 GPO / Intune / SCCM 静默部署；`dev` 与 `release` 都跑 `msiexec` 装/卸冒烟
+- Windows MSI：WiX 3.14 的按机器安装包（`%ProgramFiles%\sadp-discover`、系统 PATH、
+  公共开始菜单项），供 GPO / Intune / SCCM 静默部署；`dev` 与 `release` 都跑 `msiexec` 装/卸冒烟
 - Windows 安装向导中英双语：随仓库携带 issrc `is-6_7_4` 的 `ChineseSimplified.isl`
   （Inno 6.7 自带目录没有简体中文），`[Languages]` 挂中英两份，任务文案也都有中文
 - Windows ARM64：`scripts/build-windows.ps1 -Arch arm64` 在 x64 上交叉编译，

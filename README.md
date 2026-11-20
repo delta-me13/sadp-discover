@@ -109,7 +109,7 @@ gh run watch
 | 产物 | 装什么 | 适合 |
 |---|---|---|
 | `…-setup.exe` | `%LOCALAPPDATA%\Programs\sadp-discover` 下的两个 exe，开始菜单快捷方式，CLI 加进用户 PATH；向导为中英双语 | **推荐**：不需要管理员权限，卸载走「设置 → 应用」 |
-| `…-windows-x86_64.msi` | 同样的文件与 PATH 行为，走 Windows Installer | 企业批量部署（GPO / Intune / SCCM），可 `/qn` 静默 |
+| `…-windows-x86_64.msi` | `%ProgramFiles%\sadp-discover`，两个 exe + 开始菜单快捷方式，CLI 加进**系统** PATH | 企业批量部署（GPO / Intune / SCCM），`/qn` 静默；安装/卸载需要管理员 |
 | `…-windows-x86_64.zip` | 同样这几个文件，解压即用 | 便携、免安装、丢进 U 盘 |
 | `…-windows-arm64.zip` / `-arm64-setup.exe` / `-arm64.msi` | 同上，ARM64 原生 | Windows on ARM（x64 仿真包也能跑，但原生更快） |
 
@@ -118,7 +118,7 @@ gh run watch
 .\sadp-discover-<version>-windows-x86_64-setup.exe
 .\sadp-discover-<version>-windows-x86_64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES
 
-# MSI：按用户静默安装 / 卸载（企业部署用；不要与 setup.exe 同时装）
+# MSI：按机器静默安装 / 卸载（在管理员终端里执行，企业部署用）
 msiexec /i .\sadp-discover-<version>-windows-x86_64.msi /qn
 msiexec /x .\sadp-discover-<version>-windows-x86_64.msi /qn
 
@@ -127,8 +127,9 @@ Expand-Archive sadp-discover-<version>-windows-x86_64.zip -DestinationPath .
 .\sadp-discover-<version>-windows-x86_64\sadp-discover-gui.exe
 ```
 
-> **二选一**：Inno 安装器与 MSI 写同一个安装目录、同一条用户 PATH、同一个开始菜单项，
-> 同一台机器上只装一种。ARM64 包只能装在 ARM64 Windows 上。
+> **两种安装器装在不同位置**：Inno 是「按用户」（`%LOCALAPPDATA%` + 用户 PATH，不需要管理员），
+> MSI 是「按机器」（`%ProgramFiles%` + 系统 PATH，需要管理员）。同一台机器上建议只装一种；
+> 两者开始菜单项同名。ARM64 包只能装在 ARM64 Windows 上。
 
 装完**新开一个命令行窗口**才看得到 PATH 里的 `sadp-discover`。首次扫描时 Windows
 防火墙会问是否允许访问网络，请勾选「专用网络」并允许——拒绝之后设备回包会被丢掉，

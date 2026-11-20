@@ -10,7 +10,7 @@ Windows 侧有三种交付形态：**Inno 安装器**（推荐给个人用户）
 | 文件 | 说明 |
 |---|---|
 | `dist/windows/sadp-discover-<ver>-windows-<arch>-setup.exe` | Inno Setup 安装器：按用户安装、开始菜单快捷方式、CLI 加进 PATH、中英双语向导、自带卸载器 |
-| `dist/windows/sadp-discover-<ver>-windows-<arch>.msi` | Windows Installer 包：布局与安装器一致，供 GPO / Intune / SCCM 静默部署 |
+| `dist/windows/sadp-discover-<ver>-windows-<arch>.msi` | Windows Installer 包：为所有用户安装到 `%ProgramFiles%`，供 GPO / Intune / SCCM 静默部署 |
 | `dist/sadp-discover-<ver>-windows-<arch>.zip` | 便携包，解开是 `sadp-discover-<ver>-windows-<arch>/` 一个目录 |
 | `dist/SHA256SUMS-windows.txt` | x64 的 zip / setup / MSI 的 SHA-256 |
 | `dist/SHA256SUMS-windows-arm64.txt` | ARM64 的同上一份 |
@@ -67,20 +67,33 @@ PATH 的增删写在 `[Code]` 里而不是 `[Registry]`：`[Registry]` 在卸载
 
 `packaging/windows/msi/product.wxs` + WiX Toolset 3.14（`candle` / `light`）。
 
-定位是**企业静默部署**：没有向导、没有许可页，`msiexec /qn` 装完即用。安装布局与 Inno
-安装器完全一致：`%LOCALAPPDATA%\Programs\sadp-discover`、HKCU 的 PATH、当前用户开始菜单。
+定位是**企业静默部署**：没有向导、没有许可页，`msiexec /qn` 装完即用。与 Inno 安装器
+刻意采用不同的作用域——MSI 是**按机器**安装：
+
+| 项 | 位置 |
+|---|---|
+| 文件 | `%ProgramFiles%\sadp-discover`（`ProgramFiles64Folder`） |
+| PATH | `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment` 的 `Path` |
+| 快捷方式 | 公共开始菜单 `sadp-discover.lnk`（`CommonProgramsFolder`） |
+| 卸载信息 | `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\...` |
+| 权限 | `InstallScope="perMachine"` + `InstallPrivileges="elevated"`，安装/卸载要管理员 |
+
+为什么不做成按用户：GPO / Intune / SCCM 以 SYSTEM 运行，按用户包会把文件装进 SYSTEM 的
+profile；企业批量部署需要机器级落点。个人用户走 Inno 安装器（按用户、不弹 UAC）。
 
 | 组件 | 内容 | KeyPath |
 |---|---|---|
-| `MainBinaries` | 两个 exe + README + 两份许可 | HKCU `Software\sadp-discover\Binaries` |
-| `PathEnvironment` | `Environment` 表把 `[INSTALLFOLDER]` 追加进用户 PATH | HKCU `Software\sadp-discover\PathEntry` |
-| `StartMenuShortcut` | 开始菜单根下的 `sadp-discover.lnk` | HKCU `Software\sadp-discover\StartMenuShortcut` |
+| `MainBinaries` | 两个 exe + README + 两份许可 | HKLM `Software\sadp-discover\Binaries` |
+| `PathEnvironment` | `Environment` 表把 `[INSTALLFOLDER]` 追加进系统 PATH（`System="yes"`） | HKLM `Software\sadp-discover\PathEntry` |
+| `StartMenuShortcut` | 公共开始菜单根下的 `sadp-discover.lnk` | HKLM `Software\sadp-discover\StartMenuShortcut` |
 
 几个踩过的坑，改 wxs 时别退回去：
 
-- **按用户安装的组件不能用文件当 KeyPath**（ICE38），必须挂 HKCU 注册表值；
-  用户目录下的文件夹要写 `RemoveFolder`（ICE64），否则卸载后留空目录。
-- **`InstallScope="perUser"`**：不写这个，MSI 默认按机器装，会去写 `Program Files` 与 HKLM。
+- **组件不能用文件当 KeyPath**（ICE38），挂一个 HKLM 注册表值。
+- **按机器安装必须用 `CommonProgramsFolder`**，不能用 `ProgramMenuFolder`：后者按用户
+  解析，配 HKLM KeyPath 会连报 ICE38 / ICE43 / ICE57。
+- **`InstallScope="perMachine"` + `InstallPrivileges="elevated"`**：light 会写入 `ALLUSERS=1`；
+  不写就退化成按用户，ARP 与 PATH 全跑偏。
 - **`Codepage="936"`**：`DowngradeErrorMessage` 是中文，默认 1252 会让 light 直接报 LGHT0311。
 - **`MajorUpgrade AllowSameVersionUpgrades="yes"`**：CI 冒烟会反复装同一个版本；
   代价是 light 会报 ICE61 警告（无害）。
@@ -88,14 +101,17 @@ PATH 的增删写在 `[Code]` 里而不是 `[Registry]`：`[Registry]` 在卸载
   Inno 不带。脚本与冒烟比较前统一 `TrimEnd('\')`。
 - **不要用 `INSTALLFOLDER=` 覆盖安装目录做冒烟**：覆盖值不会在卸载时保留，卸载会去删
   默认目录，自定义目录与 PATH 全部残留。冒烟固定用默认目录。
+- **冒烟需要管理员**：`scripts/windows/smoke-msi.ps1` 会先检查提权，未提权直接报错；
+  CI 的 windows runner 默认管理员。
 
 ```powershell
+# 管理员终端
 msiexec /i .\sadp-discover-<ver>-windows-x86_64.msi /qn /norestart /l*v install.log
 msiexec /x .\sadp-discover-<ver>-windows-x86_64.msi /qn /norestart
 ```
 
-与 Inno 安装器**二选一**：两者写同一个目录、同一条 PATH、同一个快捷方式，混装后卸载
-其中一个会把另一个的入口拆掉。
+与 Inno 安装器装在不同位置（`Program Files` vs `%LOCALAPPDATA%`），PATH 作用域也不同
+（系统 vs 用户），但开始菜单项同名，**同一台机器上建议只装一种**。
 
 ## 4. exe 上的资源
 

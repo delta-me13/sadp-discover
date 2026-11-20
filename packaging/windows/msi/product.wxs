@@ -25,9 +25,13 @@
            UpgradeCode="18257F6B-CC5B-4CD2-A6BB-8574D4A0FBE3"
            Codepage="936">
 
+    <!-- 按机器安装：企业批量部署（GPO / Intune / SCCM）以 SYSTEM 运行，
+         按用户装会把文件放进 SYSTEM 的 profile。代价是安装/卸载需要管理员。
+         与 Inno 安装器的「按用户」形态刻意不同：一个给个人，一个给企业。 -->
     <Package InstallerVersion="500"
              Compressed="yes"
-             InstallScope="perUser"
+             InstallScope="perMachine"
+             InstallPrivileges="elevated"
              Platform="$(var.Platform)" />
 
     <!-- 同版本重装也允许：CI 冒烟会反复装同一个包。 -->
@@ -35,6 +39,7 @@
                   DowngradeErrorMessage="已安装更新的 sadp-discover，请先卸载再装这个版本。" />
 
     <MediaTemplate EmbedCab="yes" />
+
 
     <Icon Id="ProductIcon" SourceFile="$(var.RepoRoot)\assets\sadp-discover.ico" />
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
@@ -45,29 +50,26 @@
 
     <!-- 目录布局与 Inno 安装器完全一致：%LOCALAPPDATA%\Programs\sadp-discover -->
     <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="LocalAppDataFolder">
-        <Directory Id="ProgramsFolder" Name="Programs">
-          <Directory Id="INSTALLFOLDER" Name="sadp-discover" />
-        </Directory>
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="sadp-discover" />
       </Directory>
-      <Directory Id="ProgramMenuFolder" />
+      <Directory Id="CommonProgramsFolder" />
     </Directory>
 
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="MainBinaries" Guid="0A9A77AC-8D40-4F69-8453-8EB2E13C1939">
-        <!-- 按用户安装：组件的 KeyPath 必须是 HKCU 下的注册表值，不能是文件（ICE38）。 -->
-        <RegistryValue Root="HKCU" Key="Software\sadp-discover" Name="Binaries" Type="integer" Value="1" KeyPath="yes" />
+        <!-- 组件不能用文件当 KeyPath（ICE38），挂一个 HKLM 注册表值。 -->
+        <RegistryValue Root="HKLM" Key="Software\sadp-discover" Name="Binaries" Type="integer" Value="1" KeyPath="yes" />
         <File Id="CliExe" Source="$(var.Payload)\sadp-discover.exe" />
         <File Id="GuiExe" Source="$(var.Payload)\sadp-discover-gui.exe" />
         <File Id="Readme" Source="$(var.Payload)\README.md" />
         <File Id="LicenseMit" Source="$(var.Payload)\LICENSE-MIT" />
         <File Id="LicenseApache" Source="$(var.Payload)\LICENSE-APACHE" />
-        <!-- 用户目录下的文件夹不写 RemoveFile 会残留（ICE64）；空的才会被删掉。 -->
+        <!-- 只删空目录：用户自己往里放东西时保留。 -->
         <RemoveFolder Id="RemoveINSTALLFOLDER" Directory="INSTALLFOLDER" On="uninstall" />
-        <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
       </Component>
 
-      <!-- PATH 追加 / 卸载时摘除。Environment 本身不能当 KeyPath，配一个 HKCU 值。 -->
+      <!-- PATH 追加 / 卸载时摘除。Environment 本身不能当 KeyPath，配一个 HKLM 值。 -->
       <Component Id="PathEnvironment" Guid="1B1CF8FD-CF17-4A4A-B45E-38FD11D7865D">
         <Environment Id="PathEntry"
                      Name="PATH"
@@ -75,8 +77,8 @@
                      Permanent="no"
                      Part="last"
                      Action="set"
-                     System="no" />
-        <RegistryValue Root="HKCU"
+                     System="yes" />
+        <RegistryValue Root="HKLM"
                        Key="Software\sadp-discover"
                        Name="PathEntry"
                        Type="integer"
@@ -87,14 +89,14 @@
 
     <!-- 快捷方式直接放在「开始菜单\程序」根下，与 Inno 安装器一致；
          不要建子目录，卸载时也不需要 RemoveFolder（快捷方式随组件删除）。 -->
-    <DirectoryRef Id="ProgramMenuFolder">
+    <DirectoryRef Id="CommonProgramsFolder">
       <Component Id="StartMenuShortcut" Guid="87D092EC-1F5D-411B-A7A5-B99BA8A6A9AC">
         <Shortcut Id="StartMenuShortcut"
                   Name="sadp-discover"
                   Target="[INSTALLFOLDER]sadp-discover-gui.exe"
                   WorkingDirectory="INSTALLFOLDER"
                   Advertise="no" />
-        <RegistryValue Root="HKCU"
+        <RegistryValue Root="HKLM"
                        Key="Software\sadp-discover"
                        Name="StartMenuShortcut"
                        Type="integer"
