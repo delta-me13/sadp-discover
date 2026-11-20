@@ -53,7 +53,7 @@
       <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLFOLDER" Name="sadp-discover" />
       </Directory>
-      <Directory Id="CommonProgramsFolder" />
+      <Directory Id="ProgramMenuFolder" />
     </Directory>
 
     <DirectoryRef Id="INSTALLFOLDER">
@@ -89,7 +89,7 @@
 
     <!-- 快捷方式直接放在「开始菜单\程序」根下，与 Inno 安装器一致；
          不要建子目录，卸载时也不需要 RemoveFolder（快捷方式随组件删除）。 -->
-    <DirectoryRef Id="CommonProgramsFolder">
+    <DirectoryRef Id="ProgramMenuFolder">
       <Component Id="StartMenuShortcut" Guid="87D092EC-1F5D-411B-A7A5-B99BA8A6A9AC">
         <Shortcut Id="StartMenuShortcut"
                   Name="sadp-discover"

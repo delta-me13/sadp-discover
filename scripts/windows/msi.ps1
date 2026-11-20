@@ -48,7 +48,10 @@ Write-Step "candle：$(Split-Path $cfg.Msi -Leaf)（$($cfg.Arch)）"
 if ($LASTEXITCODE -ne 0) { throw "candle 失败（退出码 $LASTEXITCODE）" }
 
 Write-Step 'light'
-$lightArgs = @('-nologo', '-out', $cfg.Msi)
+# ICE38/43/57 是对「ProgramMenuFolder 属于用户目录」的静态判断；本包是 perMachine +
+# ALLUSERS=1，运行时该属性解析到所有用户的「开始菜单\程序」，快捷方式与 HKLM KeyPath
+# 都是一致的。静态 ICE 看不到 ALLUSERS，故只抑制这三条，其余 ICE 保持开启。
+$lightArgs = @('-nologo', '-out', $cfg.Msi, '-sice:ICE38', '-sice:ICE43', '-sice:ICE57')
 & $light @lightArgs $wixobj
 if ($LASTEXITCODE -ne 0) { throw "light 失败（退出码 $LASTEXITCODE）" }
 if (-not (Test-Path $cfg.Msi)) { throw "light 报成功但产物不存在：$($cfg.Msi)" }
