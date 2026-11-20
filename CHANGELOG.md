@@ -48,6 +48,9 @@
   在冒烟里统一归一化
 - ARM64 交叉编译不再依赖 `vcvarsall.bat`（受限会话里 `cmd.exe` 直接 `ERROR_ELEVATION_REQUIRED`），
   改为自己拼 PATH / LIB / INCLUDE，并支持 `SADP_XWIN_SPLAT` 作为无 VS ARM64 组件时的退路
+- MSI 快捷方式目录写成 `CommonProgramsFolder`（不是 Windows Installer 的标准文件夹属性）
+  会被静默忽略、两处开始菜单都没有快捷方式；改回 `ProgramMenuFolder`，由 `ALLUSERS=1`
+  解析到公共菜单，并只抑制静态判断看不到 ALLUSERS 的 ICE38/43/57
 - `--interface` 纯数字只按网卡索引解释：此前 `-i 1` 会同时按 IPv4 前缀命中 `192.168.*` / `10.*` 等网卡，回环扫描实际扫了全网卡（Windows 真机测试发现）
 - GUI 表格「激活」列与详情「DHCP」行把不存在的 `tui.yes` / `tui.no` / `tui.none` 当成 key，界面上直接显示 key 原文；改用 `common.*`，并新增源码 key 扫描测试防止同类漏配
 - GUI 表格文字默认参与文本选择，点中 IP/型号等文字会吞掉点击，导致整行选中与双击 IP 只有空白处生效；表格区域关闭 `selectable_labels`，点击可穿透到整行
