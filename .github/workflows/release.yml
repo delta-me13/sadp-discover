@@ -315,6 +315,11 @@ jobs:
     # 手动试跑永远不发布：构建与上传 artifact 已经完成，这里只负责「打 tag 才发」。
     if: github.event_name == 'push'
     steps:
+      # 发布页正文取自 CHANGELOG.md，所以要 checkout（tag 的树，不是 main 的树）。
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
       - uses: actions/download-artifact@v4
         with:
           path: release
@@ -357,16 +362,34 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      # 正文不手写：CHANGELOG 的 [version] 段落 + 按真实产物生成的下载表，
+      # 与 tag 的树和附件一一对应，可复现。没有该版本段落时回退到自动 notes。
+      - name: Render release notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if bash scripts/release/notes.sh "$VERSION" release > "$RUNNER_TEMP/release-notes.md"; then
+            echo "正文由 scripts/release/notes.sh 生成（$VERSION）"
+          else
+            rm -f "$RUNNER_TEMP/release-notes.md"
+            echo "::warning::CHANGELOG 里没有 [$VERSION] 段落，回退到 --generate-notes"
+          fi
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
-          # 这个 job 没有 checkout：gh 要靠 --repo 才知道往哪个仓库发版，
-          # 否则新版 gh 会先去找 .git，报 fatal: not a git repository。
-          args=(--repo "$GITHUB_REPOSITORY" --title "sadp-discover $VERSION" --generate-notes)
-          # 带连字符的 tag（v1.2.3-rc1）按预发布处理。
+          # --repo：不依赖当前目录是不是 git 仓库。
+          args=(--repo "$GITHUB_REPOSITORY" --title "sadp-discover $VERSION")
+          if [ -f "$RUNNER_TEMP/release-notes.md" ]; then
+            args+=(--notes-file "$RUNNER_TEMP/release-notes.md")
+          else
+            args+=(--generate-notes)
+          fi
+          # 带连字符的 tag（v1.2.3-rc.1）按预发布处理。
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             args+=(--prerelease)
           fi

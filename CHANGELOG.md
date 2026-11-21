@@ -65,6 +65,8 @@
 - GUI 的 CSV 表头改为与 `--csv` 一致的 20 列；GUI JSON 设备对象补齐 `seen_via` / `seen_on` / 首次·最近发现时间，并带 `elapsed_ms` / `port` / `families` / `rounds`
 - TUI 快捷键统一以大写展示并全部大小写不敏感；日志键 `J` → `O`、排序方向键 `T` → `D`（避免与小写 `j` 下移、`t` 换排序列冲突）
 - README 状态区简化为能力概览，里程碑细节归档到 `docs/ARCHITECTURE.md`
+- 发布页正文改由 `scripts/release/notes.sh` 生成：CHANGELOG 的版本段落 + 按附件生成的下载表
+  + 校验/未签名说明；此前是手写的，和 CHANGELOG 脱节，下次发版也没法复用
 
 ## [0.1.0] - 2026-11-12
 

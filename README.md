@@ -102,6 +102,19 @@ gh run watch
 试跑同样过版本闸门（`version` 必须等于 workspace 版本），产物在 run 页面的 Artifacts 里，
 不会出现在 Releases；没有 secrets 时按「Windows 未签名 + macOS ad-hoc」构建。
 
+Release 页面不是手写的，`publish` 用 `scripts/release/notes.sh` 生成正文：
+
+- 标题固定 `sadp-discover <version>`（`<version>` 就是 `cargo pkgid -p sadp-cli` 的值）；
+- 正文 = `CHANGELOG.md` 里 `## [<version>]` 段落 + 按真实附件生成的下载表 + 校验 / 未签名说明；
+- 没有该版本段落时回退到 GitHub 自动 notes，并在 run 里留一条 warning；
+- 带 `-` 的 tag 自动勾 prerelease；附件固定是 9 个产物 + `SHA256SUMS.txt`。
+
+想先看正文长什么样，在本地跑（第二个参数给产物目录，下载表就按真实文件生成）：
+
+```bash
+bash scripts/release/notes.sh 0.1.0-rc.1
+```
+
 ## 安装与卸载
 
 ### Windows
