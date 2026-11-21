@@ -35,6 +35,8 @@ jobs:
   # 发布前的最后一道闸：版本号必须与 Cargo.toml 一致，
   # 否则会出现「包叫 1.0.0、--version 却报 0.1.0」的发布事故。
   # tag 触发时比对 tag；手动试跑时比对 input，绝不因为「试跑」而跳过闸门。
+  # 预发布 tag（v0.1.0-rc1）只放宽「-」后缀：数字部分仍须等于 Cargo.toml，
+  # 否则 rc 就成了「版本号不用改也能发版」的旁路。
   version:
     name: version gate
     runs-on: ubuntu-latest
@@ -59,8 +61,10 @@ jobs:
           fi
           tag="${raw#v}"
           manifest=$(cargo pkgid -p sadp-cli | sed -e 's/.*[#@]//')
-          if [ "$tag" != "$manifest" ]; then
-            echo "::error::${label} 与 Cargo.toml 的 $manifest 不一致，先改版本号再构建"
+          # v0.1.0-rc1 这类预发布 tag 只放宽后缀：数字部分必须与 Cargo.toml 相同，
+          # 产物名仍取 Cargo.toml 的版本（0.1.0），只有 Release 标题与 tag 带 rc。
+          if [ "$tag" != "$manifest" ] && [ "${tag%%-*}" != "$manifest" ]; then
+            echo "::error::${label} 与 Cargo.toml 的 $manifest 不一致（预发布请用 ${manifest}-rc1 形式），先改版本号再构建"
             exit 1
           fi
           echo "version=$tag" >> "$GITHUB_OUTPUT"
