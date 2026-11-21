@@ -2,9 +2,10 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循语义化版本。
 
-> 发布状态：`v0.1.0` 的 Git tag 与 GitHub Release 尚未创建，下方对比/发布链接在补 tag 前不可用。
+> 发布状态：`v0.1.0-rc.1` 已作为预发布发布（未签名产物，见 `docs/WINDOWS-PACKAGING.md`）；
+> `v0.1.0` 正式版的 tag 与 Release 尚未创建，`[0.1.0]` 链接在补 tag 前不可用。
 
-## [Unreleased]
+## [0.1.0-rc.1] - 2026-11-21
 
 ### Added
 
@@ -75,5 +76,5 @@
 - macOS 适配：通用二进制构建脚本、签名/公证说明、本地网络权限与防火墙排障文档
 - `sadp-fake-device`：无真机时的端到端假设备
 
-[Unreleased]: https://github.com/delta-me13/sadp-discover/compare/v0.1.0...HEAD
+[0.1.0-rc.1]: https://github.com/delta-me13/sadp-discover/releases/tag/v0.1.0-rc.1
 [0.1.0]: https://github.com/delta-me13/sadp-discover/releases/tag/v0.1.0
