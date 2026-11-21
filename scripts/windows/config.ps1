@@ -52,11 +52,17 @@ function Get-SadpConfig {
         Join-Path $dist "SHA256SUMS-windows-$archSlug.txt"
     }
 
+    # Inno 的 VersionInfoVersion 只收 x.y.z.w 四段数字，预发布后缀要丢掉。
+    $fileVersion = Get-SadpFileVersion $version
+    # WiX 的 ProductVersion 只收三段数字（0.1.0-rc.1 → 0.1.0）：
+    # 第四段和预发布后缀都会让 light 直接报错。
+    $msiVersion = ($fileVersion.Split('.') | Select-Object -First 3) -join '.'
+
     [pscustomobject]@{
         Root        = $root
         Version     = $version
-        # Inno 的 VersionInfoVersion 只收 x.y.z.w 四段数字，预发布后缀要丢掉。
-        FileVersion = Get-SadpFileVersion $version
+        FileVersion = $fileVersion
+        MsiVersion  = $msiVersion
         Arch        = $Arch
         ArchSlug    = $archSlug
         RustTarget  = $rustTarget

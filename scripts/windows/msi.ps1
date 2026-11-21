@@ -39,7 +39,7 @@ $wixobj = Join-Path $work 'product.wixobj'
 Write-Step "candle：$(Split-Path $cfg.Msi -Leaf)（$($cfg.Arch)）"
 & $candle -nologo `
     -arch $cfg.Arch `
-    "-dVersion=$($cfg.Version)" `
+    "-dVersion=$($cfg.MsiVersion)" `
     "-dPlatform=$($cfg.Arch)" `
     "-dPayload=$($cfg.Payload)" `
     "-dRepoRoot=$($cfg.Root)" `
