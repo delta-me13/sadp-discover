@@ -363,7 +363,9 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
-          args=(--title "sadp-discover $VERSION" --generate-notes)
+          # 这个 job 没有 checkout：gh 要靠 --repo 才知道往哪个仓库发版，
+          # 否则新版 gh 会先去找 .git，报 fatal: not a git repository。
+          args=(--repo "$GITHUB_REPOSITORY" --title "sadp-discover $VERSION" --generate-notes)
           # 带连字符的 tag（v1.2.3-rc1）按预发布处理。
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             args+=(--prerelease)
