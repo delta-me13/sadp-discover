@@ -57,6 +57,8 @@
 - GUI 表格文字默认参与文本选择，点中 IP/型号等文字会吞掉点击，导致整行选中与双击 IP 只有空白处生效；表格区域关闭 `selectable_labels`，点击可穿透到整行
 - macOS 上「0 设备」不再固定误报本地网络权限：只有探测包发不出去时才提示权限（Gate 2 观察项 F2）
 - Windows 上 GUI 无法构建：`wgpu-hal 30` 的 D3D12 绑定与 `windows 0.62.2` 不兼容，Windows 改用 glow 后端
+- `release` 工作流首次真实 tag 发布暴露的两处问题：版本闸门把 `v0.1.0-rc.1` 当版本不一致直接拒绝；`publish` 没有 checkout 导致新版 `gh` 报 `fatal: not a git repository`（改用 `--repo`）
+- MSI 的 `ProductVersion` 只取三段数字，`0.1.0-rc.1` 这类预发布版本不再让 `light` 失败
 
 ### Changed
 

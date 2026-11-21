@@ -16,7 +16,7 @@ on:
       version:
         description: "试跑版本号，必须与 Cargo.toml 一致（不带 v）"
         required: true
-        default: "0.1.0"
+        default: "0.1.0-rc.1"
       dry_run:
         description: "只构建并上传 artifact，不创建 GitHub Release"
         type: boolean

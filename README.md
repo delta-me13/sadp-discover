@@ -95,7 +95,7 @@ tag 必须等于 `cargo pkgid -p sadp-cli` 的版本，否则 `release` 在版�
 不想先打 tag、或还没有签名证书时，可以先手动试跑同一条流水线：
 
 ```bash
-gh workflow run release.yml -f version=0.1.0 -f dry_run=true
+gh workflow run release.yml -f version=0.1.0-rc.1 -f dry_run=true
 gh run watch
 ```
 
@@ -189,7 +189,7 @@ ad-hoc 签名，Gatekeeper 会拦首次打开。**这是已知状态，不是包
   「系统设置 → 隐私与安全性」点「仍要打开」。命令行可用
   `xattr -dr com.apple.quarantine /Applications/sadp-discover.app` 清隔离属性。
 - **校验下载**：`Get-FileHash -Algorithm SHA256 <文件>`（Windows）或
-  `shasum -a 256 <文件>`（macOS），与 Release 里的 `SHA256SUMS*.txt` 对照。
+  `shasum -a 256 <文件>`（macOS），与 Release 里的 `SHA256SUMS.txt` 对照。
   ad-hoc 签名只保证包内自洽，**不证明发布者身份**，SHA-256 与 HTTPS 下载渠道才是
   完整性依据。
 
